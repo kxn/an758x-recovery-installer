@@ -1,0 +1,549 @@
+diff --git a/cmd/Kconfig b/cmd/Kconfig
+index c702d690..b2c39022 100644
+--- a/cmd/Kconfig
++++ b/cmd/Kconfig
+@@ -2315,7 +2315,7 @@ config HTTPD_DHCP_SERVER
+ config HTTPD_SERVER_IP
+ 	string "Default httpd server address"
+ 	depends on CMD_HTTPD
+-	default "192.168.0.1"
++	default "192.168.1.1"
+ 
+ config HTTPD_SERVER_NETMASK
+ 	string "Default httpd network mask"
+diff --git a/include/env/airoha/an758x.env b/include/env/airoha/an758x.env
+index 2f5960d0..b3f873e5 100644
+--- a/include/env/airoha/an758x.env
++++ b/include/env/airoha/an758x.env
+@@ -1,7 +1,7 @@
+ /* Shared serial and network recovery entry points for Airoha boards. */
+ #ifdef CONFIG_CMD_HTTPD
+ boot_recovery=httpd dhcp
+-httpd_ipaddr=192.168.0.1
++httpd_ipaddr=192.168.1.1
+ httpd_netmask=255.255.255.0
+ #endif
+ ipaddr=192.168.0.1
+diff --git a/net/lwip/httpd-page.html b/net/lwip/httpd-page.html
+index ec50ee34..dd6f1c79 100644
+--- a/net/lwip/httpd-page.html
++++ b/net/lwip/httpd-page.html
+@@ -1,162 +1,120 @@
+ <!doctype html>
+-<html lang="en">
++<html lang="zh-CN">
+ <head>
+ <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+-<title>U-Boot</title>
++<title>Recovery</title>
+ <style>
+-:root{color-scheme:light;--blue:#1769aa;--line:#dbe1e8;--muted:#627083}
++:root{color-scheme:light;--blue:#1769aa;--line:#dbe1e8;--muted:#627083;--danger:#b42318}
+ *{box-sizing:border-box}body{margin:0;background:#f5f7fa;color:#202a36;font:15px system-ui,sans-serif}
+-main{max-width:960px;margin:auto;padding:28px 20px}header,.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}header{justify-content:space-between}
+-h1{font-size:26px;margin:0}h2{font-size:20px;margin:0 0 18px}h3{font-size:16px;margin:0 0 12px}
+-.info{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin:22px 0;padding:20px;background:white;border:1px solid var(--line);border-radius:10px}
+-.info span{display:block;color:var(--muted);margin-bottom:6px}.info strong{overflow-wrap:anywhere;font-size:16px}
+-nav{display:flex;gap:8px;margin:20px 0}button{border:1px solid var(--line);border-radius:7px;background:white;color:inherit;font:inherit;padding:9px 15px;cursor:pointer}
+-button.primary,nav button.active{background:var(--blue);border-color:var(--blue);color:white}button.danger{border-color:#b42318;color:#b42318}
+-button:disabled,input:disabled,select:disabled{opacity:.5;cursor:default}.panel,.status{background:white;border:1px solid var(--line);border-radius:10px;padding:22px;margin-bottom:16px}
+-input,select{font:inherit;padding:10px;border:1px solid #aeb9c7;border-radius:6px;max-width:100%;background:white;min-width:0}input[type=file]{flex:1}
+-label{display:block;margin-bottom:8px}.wide{width:100%}.stack{display:grid;gap:16px}.muted{color:var(--muted)}.actions{margin-top:18px}
+-progress{width:100%;height:14px;accent-color:var(--blue)}#output{white-space:pre-wrap;word-break:break-word;max-height:280px;overflow:auto;font:13px/1.5 ui-monospace,monospace;margin:14px 0 0}
+-#state{font-weight:600}#transfer{font-variant-numeric:tabular-nums;color:var(--muted)}.status .row{justify-content:space-between}
+-details{border-top:1px solid var(--line);padding-top:18px;margin-top:18px}summary{cursor:pointer;font-weight:600;margin-bottom:16px}
+-hr{border:0;border-top:1px solid var(--line);margin:26px 0}[hidden]{display:none!important}@media(max-width:650px){.info{grid-template-columns:1fr 1fr}.row input{width:100%}main{padding:18px 12px}}
++main{max-width:760px;margin:auto;padding:28px 20px}
++header{display:flex;gap:12px;align-items:center;justify-content:space-between}
++h1{font-size:24px;margin:0}h2{font-size:20px;margin:0 0 14px}
++.info{display:flex;gap:18px;margin:18px 0;padding:14px 18px;background:white;border:1px solid var(--line);border-radius:10px;flex-wrap:wrap}
++.info span{display:block;color:var(--muted);margin-bottom:4px;font-size:13px}
++button{border:1px solid var(--line);border-radius:7px;background:white;color:inherit;font:inherit;padding:9px 15px;cursor:pointer}
++button.primary{background:var(--blue);border-color:var(--blue);color:white}
++button.danger{border-color:var(--danger);color:var(--danger)}
++summary{cursor:pointer;font-weight:600}details p{line-height:1.6}
++button:disabled,input:disabled{opacity:.5;cursor:default}
++.panel,.status{background:white;border:1px solid var(--line);border-radius:10px;padding:20px;margin-bottom:14px}
++input{font:inherit;padding:10px;border:1px solid #aeb9c7;border-radius:6px;max-width:100%;background:white;min-width:0}
++input[type=file]{flex:1}
++label{display:block;margin-bottom:8px}
++.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
++.muted{color:var(--muted)}.warning{color:var(--danger)}
++.error{color:var(--danger)}
++#state{font-weight:600}#transfer{font-variant-numeric:tabular-nums;color:var(--muted)}
++.status .row{justify-content:space-between}
++progress{width:100%;height:12px;accent-color:var(--blue)}
++#output{white-space:pre-wrap;word-break:break-word;max-height:240px;overflow:auto;font:13px/1.5 ui-monospace,monospace;margin:12px 0 0}
++[hidden]{display:none!important}
++.spinner{width:30px;height:30px;border:4px solid #dbe1e8;border-top-color:var(--blue);border-radius:50%;animation:spin 1s linear infinite;margin:12px 0}
++@keyframes spin{to{transform:rotate(360deg)}}
++.reboot-note{display:flex;gap:14px;align-items:center;margin-top:14px}
+ footer{text-align:center;padding:12px 0 4px}footer a{color:var(--blue)}
+ </style>
+ </head>
+ <body><main>
+-<header><h1>U-Boot</h1><button id="language">简体中文</button></header>
++<header><h1 data-t="title">Recovery</h1><button id="language">English</button></header>
+ <div class="info">
+ <div><span data-t="model">Model</span><strong id="model">—</strong></div>
+-<div><span>RAM / Flash</span><strong id="memory">—</strong></div>
+ <div><span data-t="version">Version</span><strong id="version">—</strong></div>
+ </div>
+-<nav><button data-tab="flash" class="active" data-t="flash">Flash</button><button data-tab="backup" data-t="backup">Backup</button><button data-tab="advanced" data-t="advanced">Advanced</button></nav>
+-<section class="panel" id="flash">
+-<div id="bl2Section">
+-<h2 data-t="bl2Title">Flash BL2</h2>
+-<label for="preloader">preloader.bin / firstblock.bin</label>
+-<div class="row"><input id="preloader" type="file" accept=".bin"><button id="bl2Button" data-t="uploadWrite">Upload and write</button></div>
++<section class="panel" id="wizard">
++<div id="wizardStateBlock" class="muted"></div>
++<div id="wizardZipStep">
++<h2 data-t="wizardTitle">Recovery wizard</h2>
++<p class="muted" data-t="wizardZipHint">Select the backup ZIP created on the stock firmware. The wizard validates it before touching the device.</p>
++<div class="row"><input id="wizardZip" type="file" accept=".zip"><button id="wizardInspect" data-t="wizardInspect">Validate ZIP</button></div>
++<div id="wizardZipReport" class="muted"></div>
+ </div>
+-<hr id="bootDivider">
+-<div id="ubiSection">
+-<h2 data-t="ubiOperations">UBI operations</h2>
+-<div id="ubiManagement">
+-<p data-t="firstInstall">For the first installation, rebuild UBI first. Rebuilding erases all data in UBI.</p>
+-<button id="rebuildButton" class="danger" data-t="rebuild">Rebuild UBI</button>
++<div id="wizardPlanStep" hidden>
++<h2 data-t="wizardPlanTitle">Installation plan</h2>
++<div id="wizardPlan" class="muted"></div>
++<div id="wizardPowerWarning" class="warning"></div>
++<label><input id="wizardConfirm" type="checkbox"> <span data-t="wizardConfirmLabel">I understand: do not power off the device until the wizard finishes.</span></label>
++<button id="wizardStart" class="primary" data-t="wizardStart">Start</button>
+ </div>
+-<div id="boardDataSection">
+-<h3 class="actions" data-t="boardData">Board data</h3>
+-<div id="boardDataList" class="stack"></div>
++<div id="wizardProgressStep" hidden>
++<h2 data-t="wizardProgressTitle">Installing</h2>
++<div class="spinner"></div>
++<div id="wizardProgress"></div>
+ </div>
+-<h3 class="actions" data-t="ubootTitle">Flash U-Boot</h3>
+-<label for="uboot">bl31-uboot.fip</label>
+-<div class="row"><input id="uboot" type="file" accept=".fip,.bin"><button id="ubootButton" data-t="uploadWrite">Upload and write</button></div>
+-<h3 class="actions" data-t="install">Install system</h3>
+-<label for="firmware">sysupgrade.bin / sysupgrade.itb</label>
+-<div class="row"><input id="firmware" type="file" accept=".bin,.itb"><button id="flashButton" class="primary" data-t="uploadFlash">Upload and flash</button></div>
+-<div class="row actions"><button data-action="boot-production" data-t="bootSystem">Boot system</button><button data-action="reset" data-t="reboot">Reboot</button></div>
++<div id="wizardSysupgradeStep" hidden>
++<h2 data-t="wizardSysupgradeTitle">Install system</h2>
++<p class="muted" data-t="wizardSysupgradeHint">Upload the sysupgrade image. After writing it, the device will try to start the system; its new address depends on the firmware and network settings.</p>
++<label for="wizardFirmware">sysupgrade.bin / sysupgrade.itb</label>
++<div class="row"><input id="wizardFirmware" type="file" accept=".bin,.itb"><button id="wizardFlashButton" class="primary" data-t="uploadFlash">Upload and flash</button></div>
++<div id="wizardRebootNote" class="reboot-note muted" hidden><div class="spinner"></div><span data-t="wizardRebooting">Firmware written. Starting the system; this page may keep waiting because its new IP address is unknown.</span></div>
+ </div>
+ </section>
+-<section class="panel" id="backup" hidden>
+-<h2 data-t="backup">Backup</h2>
+-<label for="backupTarget" data-t="target">Target</label><select id="backupTarget" class="wide"></select>
+-<p id="backupHint" class="muted"></p>
+-<button id="backupButton" class="primary" data-t="download">Download backup</button>
+-</section>
+-<section class="panel" id="advanced" hidden>
+-<h2 data-t="advanced">Advanced</h2>
+-<h3 data-t="ramBoot">RAM boot</h3>
+-<div class="row"><input id="initramfs" type="file"><button id="bootButton" data-t="uploadBoot">Upload and boot</button></div>
+-<details><summary data-t="partitionWrite">Write partition</summary>
+-<div class="stack"><select id="writeTarget" class="wide"></select><input id="partitionImage" type="file"><button id="writeButton" class="danger" data-t="uploadWrite">Upload and write</button></div>
+-</details>
+-<details><summary data-t="restoreAll">Restore entire Flash</summary>
+-<p class="muted" data-t="restoreAllHint">Restores a main-area .bin from offset 0, including bootloader and board data. Bad-block offsets stay in place; OOB is not included. The file must fit in Flash.</p>
+-<div class="row"><input id="allFlashImage" type="file" accept=".bin"><button id="allFlashButton" class="danger" data-t="uploadWrite">Upload and write</button></div>
+-</details>
+-<details><summary data-t="clearBadBlocks">Clear bad block markers</summary>
+-<p class="muted" data-t="clearBadBlocksHint">Erases the entire NAND chip including factory bad blocks. All data will be lost.</p>
+-<button id="scrubButton" class="danger" data-t="clearBadBlocks">Clear bad block markers</button>
+-</details>
+-<details><summary data-t="environment">Environment</summary>
+-<div class="row"><input id="envName" placeholder="ipaddr"><input id="envValue" placeholder="192.168.0.1"><button id="envButton" data-t="save">Save</button></div>
+-</details>
+-<details><summary data-t="console">Command console</summary>
+-<div class="row"><input id="command" class="wide" placeholder="mtd list"><button id="commandButton" data-t="execute">Run</button><button data-action="exit" data-t="serial">Return to serial</button></div>
++<details class="panel" id="romRestore">
++<summary data-t="romTitle">Restore stock ROM</summary>
++<p class="muted" data-t="romHint">Use a complete main-area Flash backup from this device. Its size must equal the Flash capacity. OOB dumps, ZIP archives and sysupgrade images are not supported.</p>
++<p id="romDevice" class="muted"></p>
++<p class="warning" data-t="romWarning">This overwrites the bootloader, firmware and board data. Do not power off during restoration.</p>
++<label><input id="romConfirm" type="checkbox"> <span data-t="romConfirmLabel">I confirm this is the complete original ROM backup of this device.</span></label>
++<div class="row"><input id="romImage" type="file" accept=".bin"><button id="romRestoreButton" class="danger" data-t="romStart">Upload and restore</button></div>
++<p id="romResult"></p>
++<button id="romRebootButton" hidden data-t="romReboot">Reboot into stock firmware</button>
+ </details>
+-</section>
+ <section class="status"><div class="row"><span id="state">—</span><button id="cancel" hidden data-t="cancel">Cancel transfer</button></div>
+ <progress id="progress" max="100" value="0" hidden></progress><div id="transfer"></div><pre id="output"></pre></section>
+-<footer><a href="https://github.com/pbs05/uboot-an758x" target="_blank" rel="noopener noreferrer">GitHub · pbs05/uboot-an758x</a></footer>
++<footer><a href="https://github.com/kxn/an758x-recovery-installer" target="_blank" rel="noopener noreferrer">GitHub · AN758x Recovery Installer</a></footer>
+ </main>
+ <script>
+ 'use strict';
+ const words={
+-zh:{bl2Title:'刷写 BL2',ubiOperations:'UBI 操作',firstInstall:'首次刷机需要先重建 UBI。重建会清空其中的全部数据。',boardData:'板级数据',ubootTitle:'刷写 U-Boot',model:'机型',version:'版本',flash:'刷机',backup:'备份',advanced:'高级',install:'刷写系统',uploadFlash:'上传并刷写',bootSystem:'启动系统',reboot:'重启',target:'目标',download:'下载备份',ramBoot:'内存启动',uploadBoot:'上传并启动',rebuild:'重建 UBI',partitionWrite:'分区写入',restoreAll:'恢复整片 Flash',restoreAllHint:'从 Flash 开头恢复主数据 .bin，包含引导程序和板级数据。坏块保留原偏移，不包含 OOB。文件不能超过 Flash 容量。',flashTooLarge:'文件超过 Flash 容量',clearBadBlocks:'清除坏块标记',clearBadBlocksHint:'擦除整片 NAND 闪存，包括出厂标记的坏块。所有数据将丢失。',scrubConfirm1:'此操作将清除所有坏块标记并擦除全部数据！\n\n点击"确定"后，请在 5 秒内再次点击按钮以确认。',scrubConfirm2:'再次点击以执行清除坏块操作！',uploadWrite:'上传并写入',environment:'环境变量',save:'保存',console:'命令控制台',execute:'执行',serial:'返回串口',cancel:'取消传输',idle:'就绪',upload:'上传中',downloadPhase:'下载中',queued:'等待执行',working:'正在处理',done:'完成',error:'操作失败',erase:'擦除中',create:'创建卷',ready:'上传完成','backup-ready':'备份已就绪',verify:'校验中',write:'写入中',waiting:'等待设备响应',busy:'设备正在处理其他操作',choose:'请选择文件',failed:'请求失败',cancelled:'传输已取消',whole:'整片 Flash',mtdHint:'MTD 备份为物理主数据，坏块填充 FF；NAND OOB 不包含在文件中。',volumeHint:'UBI 卷数据',taskChanged:'设备任务已变化，请刷新页面',network:'连接中断，请检查设备状态'},
+-en:{bl2Title:'Flash BL2',ubiOperations:'UBI operations',firstInstall:'For the first installation, rebuild UBI first. Rebuilding erases all data in UBI.',boardData:'Board data',ubootTitle:'Flash U-Boot',model:'Model',version:'Version',flash:'Flash',backup:'Backup',advanced:'Advanced',install:'Install system',uploadFlash:'Upload and flash',bootSystem:'Boot system',reboot:'Reboot',target:'Target',download:'Download backup',ramBoot:'RAM boot',uploadBoot:'Upload and boot',rebuild:'Rebuild UBI',partitionWrite:'Write partition',restoreAll:'Restore entire Flash',restoreAllHint:'Restores a main-area .bin from offset 0, including bootloader and board data. Bad-block offsets stay in place; OOB is not included. The file must fit in Flash.',flashTooLarge:'File exceeds Flash capacity',clearBadBlocks:'Clear bad block markers',clearBadBlocksHint:'Erases the entire NAND chip including factory bad blocks. All data will be lost.',scrubConfirm1:'This will clear all bad block markers and erase all data!\n\nClick OK, then click the button again within 5 seconds to confirm.',scrubConfirm2:'Click again to execute scrub!',uploadWrite:'Upload and write',environment:'Environment',save:'Save',console:'Command console',execute:'Run',serial:'Return to serial',cancel:'Cancel transfer',idle:'Ready',upload:'Uploading',downloadPhase:'Downloading',queued:'Queued',working:'Working',done:'Complete',error:'Operation failed',erase:'Erasing',create:'Creating volumes',ready:'Upload complete','backup-ready':'Backup ready',verify:'Verifying',write:'Writing',waiting:'Waiting for device',busy:'Device is busy',choose:'Select a file',failed:'Request failed',cancelled:'Transfer cancelled',whole:'Entire Flash',mtdHint:'MTD backup contains physical main-area data with bad blocks padded with FF. NAND OOB is excluded.',volumeHint:'UBI volume data',taskChanged:'Device task changed; refresh the page',network:'Connection lost; check device status'}
++zh:{title:'恢复向导',model:'机型',version:'版本',wizardTitle:'恢复向导',wizardZipHint:'选择在原厂系统中生成的备份 ZIP。向导会在写入设备前完成校验。',wizardInspect:'校验 ZIP',wizardPlanTitle:'安装计划',wizardConfirmLabel:'我已知晓：从初始化 UBI 到 FIP 重写完成期间请勿断电。',wizardStart:'开始',wizardProgressTitle:'正在安装',wizardSysupgradeTitle:'安装系统',wizardSysupgradeHint:'上传 sysupgrade 镜像。写入成功后将尝试启动系统；新地址取决于固件和网络配置。',uploadFlash:'上传并刷写',cancel:'取消传输',idle:'就绪',upload:'上传中',downloadPhase:'下载中',queued:'等待执行',working:'正在处理',done:'完成',error:'操作失败',waiting:'等待设备响应',busy:'设备正在处理其他操作',choose:'请选择文件',failed:'请求失败',cancelled:'传输已取消',network:'连接中断，请检查设备状态',taskChanged:'设备任务已变化，请刷新页面',wizardRebooting:'固件已写入，正在启动系统。新地址无法自动确定，本页可能持续等待。',wizardStateDone:'已完成初始化。',wizardStatePartial:'基础卷已创建但未完成。请选择备份 ZIP 继续。',wizardStateStray:'只发现临时 FIP 卷，尚未完成初始化。请选择备份 ZIP 重建。',wizardStateFresh:'尚未初始化。请选择备份 ZIP。',wizardZipTooLarge:'ZIP 超过 16 MiB 限制。',wizardWrongModel:'ZIP 的机型与本机不符',wizardNoLayout:'本机未定义板级数据卷。',wizardNoBoardData:'ZIP 内没有板级数据条目。',wizardBoardCount:'ZIP 板级条目数量与本机不符。',wizardBoardMissing:'本机缺少板级卷',wizardBoardFile:'ZIP 缺少板级文件',wizardBoardSize:'板级数据长度与本机不一致',wizardZipOk:'ZIP 校验通过，可以开始。',wizardPowerWarning:'警告：从初始化 UBI 到 FIP 重写完成期间请勿断电。断电可能导致设备无法再进入本页面。',wizardPlanRebuild:'将重建 UBI（清空现有卷）。',wizardPlanNoRebuild:'保留现有卷，只补写不匹配项。',wizardPlanFip:'将写入 FIP。',wizardPlanFipSkip:'FIP 已匹配，跳过。',wizardPlanBoard:'写入板级数据：',wizardPlanBoardSkip:'板级数据已匹配，跳过：',wizardNoZip:'请先选择并校验备份 ZIP。',wizardNeedConfirm:'请勾选断电风险确认。',wizardStepRebuild:'1/5 重建 UBI…',wizardStepFip:'2/5 写入 FIP…',wizardStepBoard:'3/5 写入板级数据 ',wizardStepVerify:'4/5 回读校验…',wizardStepMark:'5/5 写入完成标记…',wizardDone:'初始化完成。',wizardDoneHint:'下一步：上传 sysupgrade 刷入系统。',wizardTailIncomplete:'注意：写入已完成，但收尾校验未能完成。请再次点击 Validate 验证 ZIP，完成后即可刷入 sysupgrade。',wizardRebuildIncomplete:'重建后基础卷缺失，停止。',wizardVerifyFail:'回读校验失败'},
++en:{title:'Recovery',model:'Model',version:'Version',wizardTitle:'Recovery wizard',wizardZipHint:'Select the backup ZIP created on the stock firmware. The wizard validates it before touching the device.',wizardInspect:'Validate ZIP',wizardPlanTitle:'Installation plan',wizardConfirmLabel:'I understand: do not power off the device until the wizard finishes.',wizardStart:'Start',wizardProgressTitle:'Installing',wizardSysupgradeTitle:'Install system',wizardSysupgradeHint:'Upload the sysupgrade image. After writing it, the device will try to start the system; its new address depends on the firmware and network settings.',uploadFlash:'Upload and flash',cancel:'Cancel transfer',idle:'Ready',upload:'Uploading',downloadPhase:'Downloading',queued:'Queued',working:'Working',done:'Complete',error:'Operation failed',waiting:'Waiting for device',busy:'Device is busy',choose:'Select a file',failed:'Request failed',cancelled:'Transfer cancelled',network:'Connection lost; check device status',taskChanged:'Device task changed; refresh the page',wizardRebooting:'Firmware written. Starting the system; this page may keep waiting because its new IP address is unknown.',wizardStateDone:'Initialization complete.',wizardStatePartial:'Base volumes exist but are incomplete. Select the backup ZIP to continue.',wizardStateStray:'Only a stray FIP volume exists. Select the backup ZIP to rebuild.',wizardStateFresh:'Not initialized. Select the backup ZIP.',wizardZipTooLarge:'ZIP exceeds the 16 MiB limit.',wizardWrongModel:'ZIP model does not match this device',wizardNoLayout:'This build defines no board data.',wizardNoBoardData:'ZIP has no board data.',wizardBoardCount:'ZIP board data count differs from this device.',wizardBoardMissing:'Device is missing board volume',wizardBoardFile:'ZIP is missing board file',wizardBoardSize:'Board data size differs from this device',wizardZipOk:'ZIP validated. Ready to start.',wizardPowerWarning:'Warning: do not power off the device from the start of UBI initialization until the FIP rewrite completes. A power loss may leave the device unable to reach this page.',wizardPlanRebuild:'UBI will be rebuilt (erases existing volumes).',wizardPlanNoRebuild:'Existing volumes are kept; only mismatches are written.',wizardPlanFip:'FIP will be written.',wizardPlanFipSkip:'FIP matches; skipped.',wizardPlanBoard:'Write board data: ',wizardPlanBoardSkip:'Board data matches; skipped: ',wizardNoZip:'Select and validate the backup ZIP first.',wizardNeedConfirm:'Check the power-loss acknowledgement.',wizardStepRebuild:'1/5 Rebuilding UBI…',wizardStepFip:'2/5 Writing FIP…',wizardStepBoard:'3/5 Writing board data ',wizardStepVerify:'4/5 Verifying readback…',wizardStepMark:'5/5 Writing completion marker…',wizardDone:'Initialization complete.',wizardDoneHint:'Next: upload the sysupgrade to install the system.',wizardTailIncomplete:'Note: the writes completed but the tail verification could not finish. Click Validate again; once verified you can flash the sysupgrade.',wizardRebuildIncomplete:'Base volumes missing after rebuild; stopped.',wizardVerifyFail:'Readback verification failed'}
+ };
+-let language=(navigator.language||'').toLowerCase().startsWith('zh')?'zh':'en', localBusy=false, remoteBusy=true, activeXHR=null, targets=[], flashBytes=0, selectedTab='flash', rebooting=false;
+-const el=id=>document.getElementById(id), t=key=>words[language][key]||key, text=(id,value)=>{el(id).textContent=value};
++let language=(navigator.language||'').toLowerCase().startsWith('zh')?'zh':'en';
++let localBusy=false,remoteBusy=true,activeXHR=null,rebooting=false,localError='';
++const el=id=>document.getElementById(id),t=key=>words[language][key]||key,text=(id,value)=>{el(id).textContent=value};
+ function applyLanguage(){
+  document.documentElement.lang=language==='zh'?'zh-CN':'en';
++ document.title=t('title');
+  document.querySelectorAll('[data-t]').forEach(e=>e.textContent=t(e.dataset.t));
+- text('language',language==='zh'?'English':'简体中文');catalog();
++ el('language').textContent=language==='zh'?'English':'简体中文';
+ }
++el('language').onclick=()=>{language=language==='zh'?'en':'zh';applyLanguage()};
+ function bytes(n){return n>=1048576?(n/1048576).toFixed(1)+' MiB':n>=1024?(n/1024).toFixed(1)+' KiB':n+' B'}
+-function controls(){
+- document.querySelectorAll('button,input,select').forEach(e=>{e.disabled=localBusy||remoteBusy});
+- el('cancel').disabled=false;el('cancel').hidden=!activeXHR;
+-}
+-function tab(name){selectedTab=name;['flash','backup','advanced'].forEach(n=>{el(n).hidden=n!==name;document.querySelector('[data-tab="'+n+'"]').classList.toggle('active',n===name)})}
+-function hint(){const v=targets[Number(el('backupTarget').value)];text('backupHint',v?t(v.kind==='mtd'?'mtdHint':'volumeHint'):'')}
+-function catalog(){
+- for(const id of ['backupTarget','writeTarget']){
+-  const previous=el(id).value;el(id).replaceChildren();
+-  targets.forEach((v,i)=>{
+-   if(id==='writeTarget'&&v.whole)return;
+-   const option=document.createElement('option');option.value=String(i);
+-   option.textContent=(v.whole?t('whole'):v.name)+' · '+v.kind.toUpperCase()+' · '+bytes(v.size);
+-   el(id).appendChild(option);
+-  });
+-  if([...el(id).options].some(o=>o.value===previous))el(id).value=previous;
+- }
+- hint();
+-}
+-function boardData(items){
+- const list=el('boardDataList');list.replaceChildren();
+- for(const item of items){
+-  const block=document.createElement('div');
+-  const label=document.createElement('label');label.textContent=item.target+' · '+item.kind.toUpperCase()+' · '+bytes(item.size);
+-  const row=document.createElement('div');row.className='row';
+-  const input=document.createElement('input');input.type='file';input.accept='.bin';
+-  const button=document.createElement('button');button.dataset.t='uploadWrite';button.textContent=t('uploadWrite');
+-  button.onclick=()=>run(async()=>{
+-   await task({operation:'flash-board-data',target:item.target,upload_id:await uploadFile(input)});
+-  });
+-  row.append(input,button);block.append(label,row);list.append(block);
+- }
+-}
++function controls(){document.querySelectorAll('button,input').forEach(e=>{e.disabled=localBusy||remoteBusy});el('cancel').disabled=false;el('cancel').hidden=!activeXHR;}
+ async function request(url,options){
+  const r=await fetch(url,{cache:'no-store',...options});
+- const value=await r.json();
+- if(!r.ok)throw new Error(r.status===409?t('busy'):value.error||t('failed'));
+- return value;
++ const v=await r.json();
++ if(!r.ok)throw new Error('HTTP '+r.status+' · '+url+' · '+(v.error||t('failed')));
++ return v;
+ }
+ async function refresh(){
+- const [d,s]=await Promise.all([request('/api/device'),request('/api/storage')]);targets=s.targets||[];
+- text('model',d.model);text('memory',bytes(d.ram_bytes)+' / '+bytes(d.flash_bytes));text('version',d.version);
+- flashBytes=d.flash_bytes;
+- const hasBl2=targets.some(v=>v.kind==='mtd'&&v.name==='bl2');
+- el('bl2Section').hidden=!hasBl2;el('ubiSection').hidden=!d.ubi;
+- el('bootDivider').hidden=!(hasBl2&&d.ubi);el('ubiManagement').hidden=!d.rebuild;
+- el('boardDataSection').hidden=!d.board_data.length;boardData(d.board_data);
+- document.querySelector('[data-tab="flash"]').hidden=!(hasBl2||d.ubi);
+- if(!hasBl2&&!d.ubi&&selectedTab==='flash')tab('backup');catalog();
++ const [d,s]=await Promise.all([request('/api/device'),request('/api/storage')]);
++ text('model',d.model);text('version',d.version);
+ }
+-function status(s){remoteBusy=s.busy;text('state',t(s.phase==='download'?'downloadPhase':s.phase));text('output',s.output||'');controls()}
++function status(s){remoteBusy=s.busy;text('state',localError?t('error'):t(s.phase==='download'?'downloadPhase':s.phase));text('output',localError||s.output||'');controls()}
+ async function waitTask(id){
+  let misses=0;
+  for(;;){
+-  await new Promise(resolve=>setTimeout(resolve,700));
++  await new Promise(r=>setTimeout(r,700));
+   let s;
+   try{s=await request('/api/task');misses=0}catch(e){text('state',t('waiting'));if(rebooting&&++misses>=3)return {};continue}
+   if(s.id!==id)throw new Error(t('taskChanged'));
+@@ -173,13 +131,13 @@ function transfer(url,body,responseType,progressBase=0,progressTotal=0){
+   const xhr=new XMLHttpRequest();activeXHR=xhr;controls();
+   const started=performance.now();el('progress').hidden=false;el('progress').value=0;
+   xhr.open(body?'POST':'GET',url);xhr.responseType=responseType;
+-  const onprogress=e=>{
+-   const loaded=progressBase+e.loaded;const total=progressTotal||(e.lengthComputable?e.total:0);const seconds=Math.max(.01,(performance.now()-started)/1000);
++  const onp=e=>{
++   const loaded=progressBase+e.loaded;const total=progressTotal||(e.lengthComputable?e.total:0);const sec=Math.max(.01,(performance.now()-started)/1000);
+    el('progress').value=total?100*loaded/total:0;
+-   text('transfer',bytes(loaded)+(total?' / '+bytes(total)+' · '+Math.floor(100*loaded/total)+'%':'')+' · '+bytes(e.loaded/seconds)+'/s');
++   text('transfer',bytes(loaded)+(total?' / '+bytes(total)+' · '+Math.floor(100*loaded/total)+'%':'')+' · '+bytes(e.loaded/sec)+'/s');
+   };
+-  (body?xhr.upload:xhr).onprogress=onprogress;
+-  xhr.onload=()=>{activeXHR=null;controls();if(xhr.status!==200){reject(new Error(xhr.status===409?t('busy'):t('failed')));return}resolve(xhr.response)};
++  (body?xhr.upload:xhr).onprogress=onp;
++  xhr.onload=()=>{activeXHR=null;controls();if(xhr.status!==200){const detail=responseType==='json'&&xhr.response&&xhr.response.error;reject(new Error('HTTP '+xhr.status+' · '+url+' · '+(detail||t('failed'))));return}resolve(xhr.response)};
+   xhr.onerror=()=>{activeXHR=null;controls();reject(new Error(t('network')))};
+   xhr.onabort=()=>{activeXHR=null;controls();reject(new Error(t('cancelled')))};
+   xhr.send(body||null);
+@@ -191,75 +149,32 @@ async function uploadFile(input,url='/api/upload'){
+  const s=await transfer(url,file,'json');
+  return s.upload_id;
+ }
+-async function upload(id){return uploadFile(el(id))}
+ async function run(fn){
+  if(localBusy||remoteBusy)return;
+- localBusy=true;rebooting=false;text('output','');text('transfer','');el('progress').hidden=true;controls();
++ localBusy=true;rebooting=false;localError='';text('output','');text('transfer','');el('progress').hidden=true;controls();
+  try{await fn();if(!rebooting){text('state',t('done'));await refresh()}}
+- catch(e){rebooting=false;text('state',t('error'));text('output',e.message)}
++ catch(e){rebooting=false;localError=e.message;text('state',t('error'));text('output',e.message)}
+  finally{
+   localBusy=false;
+   try{remoteBusy=(await request('/api/task')).busy}catch(e){remoteBusy=true}
+   controls();
+  }
+ }
+-document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>tab(b.dataset.tab));
+-el('language').onclick=()=>{
+- language=language==='zh'?'en':'zh';applyLanguage();
+-};
+ el('cancel').onclick=()=>activeXHR?.abort();
+-el('backupTarget').onchange=hint;
+-el('bl2Button').onclick=()=>run(async()=>{
+- await task({operation:'flash-bl2',upload_id:await upload('preloader')});
+-});
+-el('ubootButton').onclick=()=>run(async()=>{
+- await task({operation:'flash-uboot',upload_id:await upload('uboot')});
+-});
+-el('flashButton').onclick=()=>run(async()=>task({operation:'flash',upload_id:await upload('firmware')}));
+-el('bootButton').onclick=()=>run(async()=>{const id=await upload('initramfs');rebooting=true;await task({operation:'boot-upload',upload_id:id})});
+-el('writeButton').onclick=()=>run(async()=>{
+- const v=targets[Number(el('writeTarget').value)];if(!v)throw new Error(t('failed'));
+- await task({operation:'write',kind:v.kind,target:v.name,upload_id:await upload('partitionImage')});
+-});
+-el('allFlashButton').onclick=()=>run(async()=>{
+- const file=el('allFlashImage').files[0];if(!file)throw new Error(t('choose'));
+- if(file.size>flashBytes)throw new Error(t('flashTooLarge'));
+- await task({operation:'flash-all',upload_id:await uploadFile(el('allFlashImage'),'/api/upload-all-flash')});
+-});
+-el('rebuildButton').onclick=()=>run(async()=>{
+- await task({operation:'ubi-rebuild'});
+-});
+-el('backupButton').onclick=()=>run(async()=>{
+- const v=targets[Number(el('backupTarget').value)];if(!v)throw new Error(t('failed'));
+- const s=await task({operation:'backup',kind:v.kind,target:v.name});
+- text('state',t('downloadPhase'));
+- const parts=[];const total=s.download_size;const segment=4*1024*1024;
+- for(let offset=0;offset<total;offset+=segment){
+-  const length=Math.min(segment,total-offset);
+-  parts.push(await transfer('/api/download/'+s.download_id+'/'+offset+'/'+length,null,'blob',offset,total));
+- }
+- const blob=new Blob(parts,{type:'application/octet-stream'});
+- const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=v.name+(v.kind==='mtd'?'-main':'')+'.bin';
+- a.click();setTimeout(()=>URL.revokeObjectURL(a.href),10000);
+-});
+-el('envButton').onclick=()=>run(()=>task({operation:'env-set',name:el('envName').value,value:el('envValue').value}));
+-el('envName').onchange=async()=>{try{const env=await request('/api/env');if(Object.hasOwn(env,el('envName').value))el('envValue').value=env[el('envName').value]}catch(e){}};
+-el('commandButton').onclick=()=>run(()=>task({operation:'command',command:el('command').value}));
+-let scrubArmed=false,scrubTimer=null;
+-el('scrubButton').onclick=()=>{
+- if(!scrubArmed){
+-  scrubArmed=true;alert(t('scrubConfirm1'));el('scrubButton').textContent=t('scrubConfirm2');
+-  scrubTimer=setTimeout(()=>{scrubArmed=false;el('scrubButton').textContent=t('clearBadBlocks')},5000);
+-  return;
+- }
+- clearTimeout(scrubTimer);scrubArmed=false;el('scrubButton').textContent=t('clearBadBlocks');
+- run(async()=>task({operation:'nand-scrub'}));
+-};
+-document.querySelectorAll('[data-action]').forEach(b=>b.onclick=()=>run(async()=>{rebooting=true;await task({operation:b.dataset.action})}));
+ async function monitor(){
+  if(rebooting)return;
+  if(!localBusy){try{status(await request('/api/task'))}catch(e){remoteBusy=true;text('state',t('waiting'));controls()}}
+  setTimeout(monitor,1500);
+ }
+ applyLanguage();controls();refresh().then(()=>monitor()).catch(e=>{text('output',e.message);monitor()});
+-</script></body></html>
++</script>
++<script>
++{{WIZARD_SHARED_JS}}
++</script>
++<script>
++{{WIZARD_RECOVERY_JS}}
++</script>
++<script>
++{{ROM_RESTORE_JS}}
++</script>
++</body></html>
+diff --git a/net/lwip/httpd.c b/net/lwip/httpd.c
+index 44298edd..9cc3861c 100644
+--- a/net/lwip/httpd.c
++++ b/net/lwip/httpd.c
+@@ -120,6 +120,7 @@ static char output_buf[HTTPD_OUTPUT_LEN];
+ static char result_buf[HTTPD_OUTPUT_LEN * 6 + 1024];
+ static char info_buf[4096];
+ static char catalog_buf[16384];
++static char post_error[256] = "invalid request";
+ static size_t output_len;
+ static int job_result;
+ static bool httpd_running;
+@@ -266,6 +267,7 @@ static void build_info(void)
+ 	struct mtd_info *mtd;
+ 	const char *board = ofnode_read_string(ofnode_root(), "model");
+ 	u64 flash_size = 0;
++	bool flash_all = false;
+ 	unsigned int index;
+ 	bool comma = false;
+ 
+@@ -274,8 +276,10 @@ static void build_info(void)
+ 	if (CONFIG_IS_ENABLED(MTD)) {
+ 		mtd_probe_devices();
+ 		mtd_for_each_device(mtd) {
+-			if (!mtd_is_partition(mtd) && mtd->size > flash_size)
++			if (!mtd_is_partition(mtd) && mtd->size > flash_size) {
+ 				flash_size = mtd->size;
++				flash_all = mtd_uses_pages(mtd);
++			}
+ 		}
+ 	}
+ 	if (!flash_size && CONFIG_IS_ENABLED(MMC) &&
+@@ -290,6 +294,7 @@ static void build_info(void)
+ 		json_printf(&j, ",\"ram_bytes\":%llu,\"flash_bytes\":%llu",
+ 			    (unsigned long long)gd->ram_size, (unsigned long long)flash_size);
+ 		json_printf(&j, ",\"version\":"); json_string(&j, version_string);
++		json_printf(&j, ",\"flash_all\":%s", flash_all ? "true" : "false");
+ 		json_printf(&j, ",\"ubi\":%s,\"rebuild\":%s,\"board_data\":[",
+ 			    CONFIG_IS_ENABLED(CMD_UBI) ? "true" : "false",
+ 			    recovery_layout_present() ? "true" : "false");
+@@ -352,7 +357,13 @@ int fs_open_custom(struct fs_file *file, const char *name)
+ 	if (!strcmp(name, "/api/env")) {
+ 		char text[4096];
+ 		struct http_json j = { text, sizeof(text), 0, false };
+-		const char *keys[] = { "httpd_ipaddr", "httpd_netmask", "httpd_dhcp_start", "httpd_dhcp_end", "ipaddr", "netmask", "serverip", "bootcmd" };
++		const char *keys[] = {
++			"httpd_ipaddr", "httpd_netmask", "httpd_dhcp_start", "httpd_dhcp_end", "ipaddr", "netmask", "serverip", "bootcmd",
++			/* Wizard state: read-only hints for the recovery page. */
++			"wizard_target", "wizard_fip_size", "wizard_fip_sha",
++			"wizard_bd0_sha", "wizard_bd1_sha", "wizard_bd2_sha", "wizard_bd3_sha",
++			"wizard_done",
++		};
+ 		int i;
+ 
+ 		json_printf(&j, "{");
+@@ -370,8 +381,15 @@ int fs_open_custom(struct fs_file *file, const char *name)
+ 	}
+ 	if (!strcmp(name, "/api/busy"))
+ 		return fs_json(file, 409, "{\"error\":\"busy\"}", false);
+-	if (!strcmp(name, "/api/error"))
+-		return fs_json(file, 400, "{\"error\":\"invalid request\"}", false);
++	if (!strcmp(name, "/api/error")) {
++		char text[512];
++		struct http_json j = { text, sizeof(text), 0, false };
++
++		json_printf(&j, "{\"error\":");
++		json_string(&j, post_error);
++		json_printf(&j, "}");
++		return fs_json(file, 400, text, false);
++	}
+ 	if (!strncmp(name, "/api/download/", 14))
+ 		return open_download(file, name + 14);
+ 	if (!strncmp(name, "/api/", 5))
+@@ -558,11 +576,13 @@ err_t httpd_post_begin(void *connection, const char *uri,
+ 	ulong addr = env_get_ulong("loadaddr", 16, CONFIG_SYS_LOAD_ADDR);
+ 	struct mtd_info *mtd;
+ 	phys_addr_t allocated, safe_end;
++	int ret;
+ 
+ 	if (http_busy()) {
+ 		strlcpy(response_uri, "/api/busy", response_uri_len);
+ 		return ERR_ARG;
+ 	}
++	strlcpy(post_error, "invalid request", sizeof(post_error));
+ 	if (content_len <= 0)
+ 		goto reject;
+ 	if (!strcmp(uri, "/api/upload") ||
+@@ -570,9 +590,15 @@ err_t httpd_post_begin(void *connection, const char *uri,
+ 		release_flash_all_upload();
+ 		if (!strcmp(uri, "/api/upload-all-flash")) {
+ 			mtd = whole_flash_mtd();
+-			if (IS_ERR(mtd))
++			if (IS_ERR(mtd)) {
++				snprintf(post_error, sizeof(post_error),
++					 "Whole Flash NAND device unavailable (%ld)", PTR_ERR(mtd));
+ 				goto reject;
++			}
+ 			if (content_len > mtd->size) {
++				snprintf(post_error, sizeof(post_error),
++					 "ROM size %d exceeds Flash capacity %llu (main area only; no OOB)",
++					 content_len, (unsigned long long)mtd->size);
+ 				put_mtd_device(mtd);
+ 				goto reject;
+ 			}
+@@ -581,10 +607,17 @@ err_t httpd_post_begin(void *connection, const char *uri,
+ 					 gd->start_addr_sp);
+ 			allocated = safe_end;
+ 			/* LMB excludes the running bootloader, stack and reserved DRAM. */
+-			if (lmb_alloc_mem(LMB_MEM_ALLOC_MAX, 4096, &allocated,
+-					  content_len, LMB_NONE))
++			ret = lmb_alloc_mem(LMB_MEM_ALLOC_MAX, 4096, &allocated,
++					    content_len, LMB_NONE);
++			if (ret) {
++				snprintf(post_error, sizeof(post_error),
++					 "Cannot reserve %d bytes of contiguous RAM for ROM upload (%d)",
++					 content_len, ret);
+ 				goto reject;
++			}
+ 			if (!upload_region_valid(allocated, content_len)) {
++				strlcpy(post_error, "ROM upload allocation is outside safe RAM",
++					sizeof(post_error));
+ 				lmb_free(allocated, content_len, LMB_NONE);
+ 				goto reject;
+ 			}
+@@ -603,6 +636,8 @@ err_t httpd_post_begin(void *connection, const char *uri,
+ 	} else if (!strcmp(uri, "/api/task") && content_len < sizeof(storage_buf)) {
+ 		post_state.kind = HTTP_POST_TASK;
+ 	} else {
++		strlcpy(post_error, "Unknown POST endpoint or request too large",
++			sizeof(post_error));
+ 		goto reject;
+ 	}
+ 	post_state.connection = connection;
+@@ -613,6 +648,7 @@ err_t httpd_post_begin(void *connection, const char *uri,
+ 	*post_auto_wnd = 1;
+ 	return ERR_OK;
+ reject:
++	printf("HTTP POST rejected: %s (%s)\n", uri, post_error);
+ 	strlcpy(response_uri, "/api/error", response_uri_len);
+ 	return ERR_ARG;
+ }
+@@ -673,6 +709,8 @@ void httpd_post_finished(void *connection, char *response_uri, u16_t response_ur
+ 		} else {
+ 			storage_buf[post_state.received] = 0;
+ 			ret = parse_task();
++			if (ret)
++				snprintf(post_error, sizeof(post_error), "Task rejected (%d)", ret);
+ 			if (!ret) {
+ 				task_id++;
+ 				job_state = HTTP_JOB_QUEUED;
+@@ -683,6 +721,9 @@ void httpd_post_finished(void *connection, char *response_uri, u16_t response_ur
+ 			}
+ 		}
+ 	}
++	if (post_state.failed || post_state.received != post_state.expected)
++		snprintf(post_error, sizeof(post_error), "Incomplete upload: %zu of %zu bytes",
++			 post_state.received, post_state.expected);
+ 	if (ret && post_state.kind == HTTP_POST_FLASH_ALL_UPLOAD)
+ 		release_flash_all_upload();
+ 	strlcpy(response_uri, ret ? "/api/error" : "/api/reply", response_uri_len);
+@@ -1063,7 +1104,8 @@ static int run_flash_all(void)
+ 	ret = 0;
+ out_unmap:
+ 	if (ret)
+-		printf("Whole Flash restore failed at 0x%zx (%d).\n", offset, ret);
++		printf("Whole Flash restore failed during %s at 0x%zx (%d).\n",
++		       phase, offset, ret);
+ 	unmap_sysmem(uploaded);
+ out_put_mtd:
+ 	free(verify);

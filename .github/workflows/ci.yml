@@ -1,0 +1,74 @@
+name: ci
+on:
+  push:
+  pull_request:
+jobs:
+  host-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Shared library and flow tests
+        run: node --test tests/*.test.js tests/flow/*.test.js
+      - name: Recovery client tests
+        run: python3 -m unittest discover -s tests -p 'test_*.py'
+      - name: Upstream lock check
+        run: python3 tools/check-upstream.py --fail
+      - name: DTB extraction self-test
+        run: |
+          command -v dtc || { sudo apt-get update && sudo apt-get install -y device-tree-compiler; }
+          printf '/dts-v1/;\n/ { model = "Nokia XG-040G-MD"; recovery-layout { compatible = "airoha,an758x-recovery-layout"; bosa { volume-name = "bosa"; volume-size = <0x40000>; volume-type = "dynamic"; }; ri { volume-name = "ri"; volume-size = <0x40000>; volume-type = "dynamic"; }; }; };\n' > /tmp/ci.dts
+          dtc -I dts -O dtb -o /tmp/ci.dtb /tmp/ci.dts
+          python3 tools/extract-dtb.py /tmp/ci.dtb --check profiles/xg-040g-md.json
+      - name: Patched stock2ubi (host tests, manual mode)
+        run: |
+          python3 - <<'EOF'
+          import subprocess, pathlib, shutil, os
+          root = pathlib.Path('.')
+          wt = pathlib.Path('/tmp/ci-stock')
+          subprocess.run(['git', '-C', 'upstream/an758x-stock2ubi', 'worktree', 'add', '--detach', str(wt),
+                          subprocess.check_output(['git', '-C', 'upstream/an758x-stock2ubi', 'rev-parse', 'HEAD']).decode().strip()], check=True)
+          subprocess.run(['git', '-C', str(wt), 'apply', str((root / 'patches/stock2ubi/0001-stock2ubi-wizard-api-and-embedded-images.patch').resolve())], check=True)
+          for name, dest in (('build.rs', 'build.rs'), ('probe.rs', 'src/probe.rs'), ('wizard.rs', 'src/wizard.rs'), ('wizard-stock.js', 'src/wizard-stock.js')):
+              shutil.copy(f'patches/stock2ubi/files/{name}', wt / dest)
+          subprocess.run(['cargo', 'test', '--manifest-path', str(wt / 'Cargo.toml')], check=True, cwd=wt)
+          subprocess.run(['cargo', 'clippy', '--manifest-path', str(wt / 'Cargo.toml'), '--', '-D', 'warnings'], check=True, cwd=wt)
+          subprocess.run(['cargo', 'fmt', '--manifest-path', str(wt / 'Cargo.toml'), '--', '--check'], check=True, cwd=wt)
+          EOF
+      - name: Page JavaScript syntax
+        run: |
+          node --check shared/wizard-zip.js
+          node --check patches/stock2ubi/files/wizard-stock.js
+          node --check patches/uboot/files/wizard-uboot.js
+          node --check patches/uboot/files/rom-restore.js
+          python3 - <<'EOF'
+          import re, subprocess, tempfile, os, pathlib
+          root = pathlib.Path.cwd()
+          wt = pathlib.Path('/tmp/ci-uboot')
+          commit = subprocess.check_output(['git', '-C', 'upstream/uboot-an758x', 'rev-parse', 'HEAD'], text=True).strip()
+          subprocess.run(['git', '-C', 'upstream/uboot-an758x', 'worktree', 'add', '--detach', str(wt), commit], check=True)
+          subprocess.run(['git', '-C', str(wt), 'apply', str(root / 'patches/uboot/0001-uboot-wizard-env-and-page.patch')], check=True)
+          shared = open('shared/wizard-zip.js').read()
+          recovery = open('patches/uboot/files/wizard-uboot.js').read()
+          restore = open('patches/uboot/files/rom-restore.js').read()
+          text = (wt / 'net/lwip/httpd-page.html').read_text()
+          text = text.replace('{{WIZARD_SHARED_JS}}', shared, 1).replace('{{WIZARD_RECOVERY_JS}}', recovery, 1)
+          text = text.replace('{{ROM_RESTORE_JS}}', restore, 1)
+          assert '{{WIZARD' not in text
+          assert '{{ROM_RESTORE' not in text
+          blocks = re.findall(r'<script>(.*?)</script>', text, re.S)
+          for i, block in enumerate(blocks):
+              with tempfile.NamedTemporaryFile('w', suffix='.js', delete=False) as f:
+                  f.write(block); name = f.name
+              r = subprocess.run(['node', '--check', name], capture_output=True, text=True)
+              os.unlink(name)
+              assert r.returncode == 0, (i, r.stderr[:300])
+          print('inline syntax ok')
+          EOF

@@ -1,0 +1,11 @@
+[submodule "upstream/uboot-an758x"]
+	path = upstream/uboot-an758x
+	url = https://github.com/pbs05/uboot-an758x.git
+	branch = main
+[submodule "upstream/an758x-stock2ubi"]
+	path = upstream/an758x-stock2ubi
+	url = https://github.com/pbs05/an758x-stock2ubi.git
+	branch = main
+[submodule "deps/mbedtls"]
+	path = deps/mbedtls
+	url = https://github.com/Mbed-TLS/mbedtls.git

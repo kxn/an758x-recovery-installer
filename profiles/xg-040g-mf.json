@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "target": "xg-040g-mf",
+  "boot_image": "preloader",
+  "stock_model_hints": ["XG-040G-MF"],
+  "board_data": [
+    {"source_kind": "mtd", "source_names": ["bosa"], "target_volume": "bosa"},
+    {"source_kind": "mtd", "source_names": ["ri"], "target_volume": "ri"}
+  ],
+  "status": "candidate"
+}

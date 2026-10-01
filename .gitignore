@@ -1,0 +1,7 @@
+deps/*
+!deps/mbedtls
+!deps/mbedtls/
+build/
+output/
+__pycache__/
+*.pyc

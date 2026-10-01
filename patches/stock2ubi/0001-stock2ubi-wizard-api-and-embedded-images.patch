@@ -1,0 +1,953 @@
+diff --git a/Cargo.lock b/Cargo.lock
+index fefdccb..547b0f5 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -9,6 +9,7 @@ dependencies = [
+  "axum",
+  "libc",
+  "serde",
++ "serde_json",
+  "tokio",
+  "tokio-util",
+ ]
+diff --git a/Cargo.toml b/Cargo.toml
+index d8ae0ca..0ea1c0e 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -3,9 +3,12 @@ name = "an758x-stock2ubi"
+ version = "0.1.14"
+ edition = "2024"
+ license = "GPL-2.0-only"
++build = "build.rs"
++autobins = false
+ include = [
+     "Cargo.toml",
+     "Cargo.lock",
++    "build.rs",
+     "README.md",
+     ".cargo/config.toml",
+     "src/**",
+@@ -13,10 +16,15 @@ include = [
+     "an758x_mtd_rw.ko",
+ ]
+ 
++[[bin]]
++name = "airoha-installer"
++path = "src/main.rs"
++
+ [target.'cfg(target_os = "linux")'.dependencies]
+ axum = { version = "0.8", features = ["multipart"] }
+ libc = "0.2"
+ serde = { version = "1", features = ["derive"] }
++serde_json = "1"
+ tokio = { version = "1", features = ["fs", "io-util", "macros", "net", "rt-multi-thread", "time"] }
+ tokio-util = { version = "0.7", features = ["io"] }
+ 
+diff --git a/src/index.html b/src/index.html
+index a5c9d0f..245d90d 100644
+--- a/src/index.html
++++ b/src/index.html
+@@ -1,13 +1,13 @@
+ <!doctype html>
+-<html lang="en">
++<html lang="zh-CN">
+ <head>
+   <meta charset="utf-8">
+   <meta name="viewport" content="width=device-width,initial-scale=1">
+-  <title>AN758x Stock2UBI</title>
++  <title>AN758x Recovery Installer</title>
+   <style>
+     :root { color-scheme: light; font-family: system-ui, sans-serif; background: #f5f6f8; color: #18202a; }
+     body { margin: 0; padding: 32px 18px; }
+-    main { max-width: 920px; margin: auto; background: #fff; border: 1px solid #dfe3e8; border-radius: 10px; overflow: hidden; }
++    main { max-width: 720px; margin: auto; background: #fff; border: 1px solid #dfe3e8; border-radius: 10px; overflow: hidden; }
+     section { padding: 24px; }
+     section + section { border-top: 1px solid #dfe3e8; }
+     h1, h2 { margin: 0 0 18px; font-weight: 650; }
+@@ -17,98 +17,124 @@
+     .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+     .top h1 { margin-bottom: 0; }
+     .top button { flex: none; padding: 7px 12px; font-size: 13px; }
+-    .steps { display: flex; gap: 24px; padding: 0; margin: 24px 0 0; list-style: none; color: #667085; font-size: 14px; }
+-    .steps [aria-current=step] { color: #1869b7; font-weight: 650; }
+-    .step[hidden], button[hidden] { display: none; }
+     table { width: 100%; border-collapse: collapse; font-size: 14px; }
+     th, td { padding: 10px 8px; border-bottom: 1px solid #edf0f2; text-align: left; }
+     th { color: #56616f; font-weight: 600; }
+     a { color: #1267c4; text-decoration: none; }
+-    .files { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+     label { display: grid; gap: 7px; font-size: 14px; font-weight: 600; }
+-    input[type=file] { padding: 12px; border: 1px solid #cbd2d9; border-radius: 7px; background: #fafbfc; }
++    input[type=text] { padding: 10px; border: 1px solid #cbd2d9; border-radius: 7px; background: #fafbfc; font: inherit; }
+     button { padding: 11px 18px; border: 0; border-radius: 7px; background: #1869b7; color: white; font: inherit; cursor: pointer; }
+     button:disabled { background: #a9b3bd; cursor: default; }
+     button.secondary { color: #344054; background: #f2f4f7; }
+-    .actions { display: flex; justify-content: space-between; padding: 20px 24px; border-top: 1px solid #dfe3e8; }
+     footer { padding: 14px 24px; border-top: 1px solid #dfe3e8; text-align: center; font-size: 13px; }
+-    .hint, #status { margin: 12px 0 0; color: #5c6672; font-size: 14px; }
+-    #status.error { color: #b42318; }
+-    #status.ok { color: #067647; }
+-    @media (max-width: 680px) { .files { grid-template-columns: 1fr; } th:nth-child(4), td:nth-child(4), th:nth-child(5), td:nth-child(5) { display: none; } }
++    .hint, #wizard-status { margin: 12px 0 0; color: #5c6672; font-size: 14px; }
++    #wizard-status.error { color: #b42318; }
++    #wizard-status.ok { color: #067647; }
++    #wizard-panel table { margin-bottom: 14px; }
++    #wizard-panel th { width: 150px; vertical-align: top; }
++    #wizard-match.wizard-match { color: #067647; }
++    #wizard-match.wizard-partial { color: #b54708; }
++    #wizard-match.wizard-conflict { color: #b42318; }
++    #allrom-download { display: inline-block; margin-top: 14px; padding: 11px 18px; border-radius: 7px; background: #f2f4f7; color: #344054; }
++    .spinner { width: 26px; height: 26px; border: 4px solid #dbe1e8; border-top-color: #1869b7; border-radius: 50%; animation: spin 1s linear infinite; margin: 14px 0; }
++    @keyframes spin { to { transform: rotate(360deg); } }
++    .reboot-note { display: flex; gap: 14px; align-items: center; margin-top: 14px; color: #5c6672; }
++    [hidden] { display: none !important; }
+   </style>
+ </head>
+ <body>
+ <main>
+   <section>
+     <header class="top">
+-      <h1><span data-t="title">AN758x Stock2UBI Flashing Tool</span> <small>v{{VERSION}}</small></h1>
+-      <button id="language" class="secondary" type="button">Chinese</button>
++      <h1><span data-t="title">AN758x Recovery Installer</span> <small>v{{VERSION}}</small></h1>
++      <button id="language" class="secondary" type="button">English</button>
+     </header>
+-    <ol class="steps" aria-label="Wizard steps" data-t-aria="wizardSteps">
+-      <li id="step-label-backup" aria-current="step" data-t="backupStep">1. Back up partitions</li>
+-      <li id="step-label-flash" aria-current="false" data-t="flashStep">2. Install recovery bootloader</li>
+-    </ol>
+   </section>
+-  <section id="step-backup" class="step" aria-labelledby="backup-title">
+-    <h2 id="backup-title" data-t="backupTitle">Back up partitions</h2>
+-    <p class="hint" data-t="backupHint">Save a copy of any partitions you want to keep.</p>
+-    {{PARTITIONS}}
+-  </section>
+-  <section id="step-flash" class="step" aria-labelledby="flash-title" hidden>
+-    <h2 id="flash-title" data-t="flashTitle">Install recovery bootloader</h2>
+-    <p><span data-t="ubootSource">Download the U-Boot images from</span> <a href="https://github.com/pbs05/uboot-an758x" target="_blank" rel="noopener noreferrer">pbs05/uboot-an758x</a><span data-t="ubootSuffix">.</span></p>
+-    <form id="flash-form">
+-      <div class="files">
+-        <label><span data-t="bl2Label">BL2 (preloader.bin or firstblock.bin)</span>
+-          <input id="bl2" name="bl2" type="file" required>
+-        </label>
+-        <label><span data-t="fipLabel">BL31 + U-Boot FIP</span>
+-          <input id="fip" name="fip" type="file" required>
++  <section id="wizard-panel" aria-labelledby="wizard-title" hidden>
++    <h2 id="wizard-title" data-t="wizardTitle">Recovery installer</h2>
++    <table>
++      <tbody>
++        <tr><th data-t="wizardTarget">Target</th><td id="wizard-target">—</td></tr>
++        <tr><th data-t="wizardUbootModel">U-Boot model</th><td id="wizard-model">—</td></tr>
++        <tr><th data-t="wizardMatch">Identification</th><td id="wizard-match">—</td></tr>
++        <tr><th data-t="wizardReasons">Notes</th><td id="wizard-reasons">—</td></tr>
++      </tbody>
++    </table>
++    <div id="wizard-actions" hidden>
++      <p class="hint" data-t="wizardZipHint">Download the backup ZIP first and keep it safe — it contains the original first block and the board data. Only it can restore this device.</p>
++      <button id="wizard-zip" type="button" data-t="wizardZip">Download backup ZIP</button>
++      <p id="wizard-status" role="status" aria-live="polite"></p>
++      <div id="wizard-confirm" hidden>
++        <label><span data-t="wizardYesLabel">Type "yes" to confirm the ZIP is saved, then flash the embedded bootloader</span>
++          <input id="wizard-yes" type="text" autocomplete="off">
+         </label>
++        <button id="wizard-flash" type="button" data-t="wizardFlash">Flash embedded bootloader</button>
++      </div>
++      <div id="wizard-reboot-note" class="reboot-note" hidden>
++        <div class="spinner"></div>
++        <span data-t="wizardFlashing">Flashing and rebooting…</span>
+       </div>
+-      <p class="hint"><span data-t="recoveryPrefix">After rebooting, open</span> <a href="http://192.168.0.1/">192.168.0.1</a> <span data-t="recoverySuffix">to continue in U-Boot recovery. The page may take about a minute to appear on the first boot.</span></p>
+-      <p id="status" role="status" aria-live="polite"></p>
+-    </form>
++    </div>
++    <div id="wizard-fallback" hidden>
++      <p class="hint" data-t="wizardFallbackHint">The device could not be confirmed automatically. Download all visible MTD partitions as a tar archive. Partitions may overlap, and this archive is not guaranteed to cover the entire chip. Flashing is unavailable in this state.</p>
++      <a id="allrom-download" href="/backup-all.tar" data-t="wizardAllRom">Download visible MTD partitions (.tar)</a>
++    </div>
+   </section>
+-  <nav class="actions" aria-label="Wizard actions" data-t-aria="wizardActions">
+-    <button id="back" class="secondary" type="button" data-t="back" disabled>Back</button>
+-    <button id="next" type="button" data-t="next">Continue</button>
+-    <button id="submit" type="submit" form="flash-form" data-t="write" hidden disabled>Install bootloader</button>
+-  </nav>
+-  <footer><a href="https://github.com/pbs05/an758x-stock2ubi" target="_blank" rel="noopener noreferrer">GitHub · an758x-stock2ubi</a></footer>
++  <footer><a href="https://github.com/kxn/an758x-recovery-installer" target="_blank" rel="noopener noreferrer">GitHub · AN758x Recovery Installer</a></footer>
+ </main>
+ <script>
+ const words = {
+   en: {
+-    title: 'AN758x Stock2UBI Flashing Tool',
+-    wizardSteps: 'Wizard steps', wizardActions: 'Wizard actions',
+-    backupStep: '1. Back up partitions', flashStep: '2. Install recovery bootloader',
+-    backupTitle: 'Back up partitions', backupHint: 'Save a copy of any partitions you want to keep.',
+-    noPartitions: 'No MTD partitions found.', device: 'Device', name: 'Name', size: 'Size',
+-    eraseBlock: 'Erase block', physicalOffset: 'Physical offset', download: 'Download',
+-    flashTitle: 'Install recovery bootloader', ubootSource: 'Download the U-Boot images from', ubootSuffix: '.',
+-    bl2Label: 'BL2 (preloader.bin or firstblock.bin)', fipLabel: 'BL31 + U-Boot FIP',
+-    recoveryPrefix: 'After rebooting, open',
+-    recoverySuffix: 'to continue in U-Boot recovery. The page may take about a minute to appear on the first boot.',
+-    back: 'Back', next: 'Continue', write: 'Install bootloader',
+-    backupConfirm: 'Have you saved the partitions you want to keep?',
+-    working: 'Checking images and writing the bootloader…'
++    title: 'AN758x Recovery Installer',
++    wizardTitle: 'Recovery installer',
++    wizardTarget: 'Target', wizardUbootModel: 'U-Boot model', wizardMatch: 'Identification',
++    wizardReasons: 'Notes',
++    wizardZipHint: 'Download the backup ZIP first and keep it safe — it contains the original first block and the board data. Only it can restore this device.',
++    wizardZip: 'Download backup ZIP',
++    wizardYesLabel: 'Type "yes" to confirm the ZIP is saved, then flash the embedded bootloader',
++    wizardFlash: 'Flash embedded bootloader',
++    match_match: 'Match', match_partial: 'Partial — please check manually', match_conflict: 'Conflict — one-click flashing is disabled',
++    noFirstBlock: 'No MTD partition covers physical offset 0; cannot back up the first block.',
++    unsupportedSource: 'Board data source is not an MTD partition.',
++    missingPartition: 'Board data source partition could not be found.',
++    partitionSizeMismatch: 'Source partition size does not match the target volume.',
++    zipTooLarge: 'Backup exceeds the 16 MiB ZIP limit.',
++    zipReady: 'Backup ZIP downloaded. Check the file, then type "yes" below.',
++    needYes: 'Type "yes" to confirm you saved the backup ZIP.',
++    flashConfirm: 'Flash the embedded bootloader now? The device will reboot into U-Boot recovery.',
++    modelUnconfirmedConfirm: 'The device-tree model could not be read. Please confirm this device is the target model before flashing. Proceed?',
++    wizardFlashing: 'Flashing and rebooting…',
++    wizardFallbackHint: 'The device could not be confirmed automatically. Download all visible MTD partitions as a tar archive. Partitions may overlap, and this archive is not guaranteed to cover the entire chip. Flashing is unavailable in this state.',
++    wizardAllRom: 'Download visible MTD partitions (.tar)',
++    wizardUnavailable: 'Automatic device check unavailable',
++    working: 'Preparing the backup ZIP…',
++    network: 'Network request failed'
+   },
+   zh: {
+-    title: 'AN758x stock2ubi免拆刷机工具',
+-    wizardSteps: '引导步骤', wizardActions: '引导操作',
+-    backupStep: '1. 备份分区', flashStep: '2. 刷入恢复引导',
+-    backupTitle: '备份分区', backupHint: '请下载并保存需要保留的分区。',
+-    noPartitions: '没有发现 MTD 分区。', device: '设备', name: '名称', size: '大小',
+-    eraseBlock: '擦除块', physicalOffset: '物理偏移', download: '下载',
+-    flashTitle: '刷入恢复引导', ubootSource: 'U-Boot 镜像下载地址：', ubootSuffix: '。',
+-    bl2Label: 'BL2（preloader.bin 或 firstblock.bin）', fipLabel: 'BL31 + U-Boot FIP',
+-    recoveryPrefix: '重启后访问',
+-    recoverySuffix: '，继续在 U-Boot 恢复页面安装。首次启动时，页面可能需要约 1 分钟才会出现。',
+-    back: '返回', next: '继续', write: '刷入引导',
+-    backupConfirm: '需要保留的分区都备份好了吗？',
+-    working: 'Checking images and writing the bootloader…'
++    title: 'AN758x 恢复安装工具',
++    wizardTitle: '恢复安装工具',
++    wizardTarget: '目标机型', wizardUbootModel: 'U-Boot 机型', wizardMatch: '识别结果',
++    wizardReasons: '说明',
++    wizardZipHint: '请先下载备份 ZIP 并妥善保存——它包含原始首块和板级数据，是本机唯一的恢复凭据。',
++    wizardZip: '下载备份 ZIP',
++    wizardYesLabel: '输入 "yes" 确认 ZIP 已保存，然后刷入内置引导',
++    wizardFlash: '刷入内置引导',
++    match_match: '匹配', match_partial: '部分匹配——请人工核对', match_conflict: '冲突——一键刷写已禁用',
++    noFirstBlock: '没有覆盖物理偏移 0 的 MTD 分区，无法备份首块。',
++    unsupportedSource: '板级数据来源不是 MTD 分区。',
++    missingPartition: '找不到板级数据来源分区。',
++    partitionSizeMismatch: '来源分区大小与目标卷不一致。',
++    zipTooLarge: '备份超过 16 MiB 的 ZIP 限制。',
++    zipReady: '备份 ZIP 已下载。请检查文件，然后在下方输入 "yes"。',
++    needYes: '请输入 "yes" 确认已保存备份 ZIP。',
++    flashConfirm: '现在刷入内置引导吗？设备将重启进入 U-Boot 恢复。',
++    modelUnconfirmedConfirm: '设备树中的机型信息无法读取。请确认本机就是目标机型后再刷入。是否继续？',
++    wizardFlashing: '正在刷入并重启…',
++    wizardFallbackHint: '设备未能自动确认。可下载全部可见 MTD 分区的 tar 归档。分区可能重叠，归档不保证覆盖整片芯片；此状态下不提供刷写。',
++    wizardAllRom: '下载全部可见 MTD 分区（.tar）',
++    wizardUnavailable: '自动识别不可用',
++    working: '正在准备备份 ZIP…',
++    network: '网络请求失败'
+   }
+ };
+ let language = (navigator.language || '').toLowerCase().startsWith('zh') ? 'zh' : 'en';
+@@ -118,67 +144,16 @@ function applyLanguage() {
+   document.documentElement.lang = language === 'zh' ? 'zh-CN' : 'en';
+   document.title = t('title');
+   document.querySelectorAll('[data-t]').forEach(element => { element.textContent = t(element.dataset.t); });
+-  document.querySelectorAll('[data-t-aria]').forEach(element => { element.setAttribute('aria-label', t(element.dataset.tAria)); });
+   languageButton.textContent = language === 'zh' ? 'English' : '中文';
+ }
+ languageButton.addEventListener('click', () => { language = language === 'en' ? 'zh' : 'en'; applyLanguage(); });
+ applyLanguage();
+-
+-const form = document.querySelector('#flash-form');
+-const bl2 = document.querySelector('#bl2');
+-const fip = document.querySelector('#fip');
+-const back = document.querySelector('#back');
+-const next = document.querySelector('#next');
+-const submit = document.querySelector('#submit');
+-const status = document.querySelector('#status');
+-const backupStep = document.querySelector('#step-backup');
+-const flashStep = document.querySelector('#step-flash');
+-const backupLabel = document.querySelector('#step-label-backup');
+-const flashLabel = document.querySelector('#step-label-flash');
+-let writing = false;
+-function updateButton() { submit.disabled = writing || !bl2.files.length || !fip.files.length; }
+-function showStep(step) {
+-  const backup = step === 'backup';
+-  backupStep.hidden = !backup;
+-  flashStep.hidden = backup;
+-  back.disabled = backup || writing;
+-  next.hidden = !backup;
+-  submit.hidden = backup;
+-  backupLabel.setAttribute('aria-current', backup ? 'step' : 'false');
+-  flashLabel.setAttribute('aria-current', backup ? 'false' : 'step');
+-  updateButton();
+-}
+-next.addEventListener('click', () => {
+-  if (window.confirm(t('backupConfirm'))) showStep('flash');
+-});
+-back.addEventListener('click', () => showStep('backup'));
+-bl2.addEventListener('change', updateButton);
+-fip.addEventListener('change', updateButton);
+-form.addEventListener('submit', async (event) => {
+-  event.preventDefault();
+-  writing = true;
+-  back.disabled = true;
+-  updateButton();
+-  status.className = '';
+-  status.dataset.t = 'working';
+-  status.textContent = t('working');
+-  try {
+-    const response = await fetch('/api/flash', { method: 'POST', body: new FormData(form) });
+-    const body = await response.text();
+-    let message = body;
+-    try { message = JSON.parse(body).message; } catch (_) {}
+-    status.className = response.ok ? 'ok' : 'error';
+-    status.textContent = message || `HTTP ${response.status}`;
+-    writing = response.ok;
+-  } catch (_) {
+-    status.className = 'error';
+-    status.textContent = 'Network request failed';
+-    writing = false;
+-  }
+-  delete status.dataset.t;
+-  back.disabled = writing;
+-  updateButton();
+-});
++</script>
++<script>
++{{WIZARD_SHARED}}
++</script>
++<script>
++{{WIZARD_STOCK}}
+ </script>
+ </body>
+ </html>
+diff --git a/src/lib.rs b/src/lib.rs
+index f5fde87..135e1e4 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,3 +1,4 @@
+ pub mod display;
+ pub mod fip;
+ pub mod ubi;
++pub mod wizard;
+diff --git a/src/main.rs b/src/main.rs
+index a40294a..fe0a671 100644
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -3,11 +3,13 @@ mod install;
+ #[cfg(target_os = "linux")]
+ mod mtd;
+ #[cfg(target_os = "linux")]
++mod probe;
++#[cfg(target_os = "linux")]
+ mod unlock;
+ 
+ #[cfg(target_os = "linux")]
+ mod linux_app {
+-    use an758x_stock2ubi::display;
++    use an758x_stock2ubi::wizard;
+     use axum::body::Body;
+     use axum::extract::{DefaultBodyLimit, Multipart, Path};
+     use axum::http::{HeaderValue, StatusCode, header};
+@@ -18,17 +20,20 @@ mod linux_app {
+     use std::io;
+     use std::sync::atomic::{AtomicBool, Ordering};
+     use std::time::Duration;
+-    use tokio::io::AsyncReadExt;
++    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+     use tokio_util::io::ReaderStream;
+ 
+     use crate::{
+         install,
+         mtd::{self, Partition},
+-        unlock,
++        probe, unlock,
+     };
+ 
+     const INDEX_HTML: &str = include_str!("index.html");
+     const MAX_UPLOAD_SIZE: usize = 4 * 1024 * 1024;
++    // The bootstrap UBI written by install::flash() also caps the FIP the
++    // wizard embeds; keep the embed comfortably below the multipart limit.
++    const MAX_EMBEDDED_FIP: usize = 3 * 1024 * 1024;
+     // The bundled module carries this kernel release in its vermagic.
+     const STOCK_KERNEL_RELEASE: &str = "5.4.55";
+     static FLASH_IN_PROGRESS: AtomicBool = AtomicBool::new(false);
+@@ -38,41 +43,6 @@ mod linux_app {
+         message: String,
+     }
+ 
+-    fn html_escape(text: &str) -> String {
+-        text.replace('&', "&amp;")
+-            .replace('<', "&lt;")
+-            .replace('>', "&gt;")
+-            .replace('"', "&quot;")
+-    }
+-
+-    fn partition_table(partitions: &[Partition]) -> String {
+-        if partitions.is_empty() {
+-            return "<p class=\"hint\" data-t=\"noPartitions\">No MTD partitions found.</p>"
+-                .to_string();
+-        }
+-
+-        let mut html = String::from(
+-            "<table><thead><tr><th data-t=\"device\">Device</th><th data-t=\"name\">Name</th><th data-t=\"size\">Size</th><th data-t=\"eraseBlock\">Erase block</th><th data-t=\"physicalOffset\">Physical offset</th><th></th></tr></thead><tbody>",
+-        );
+-        for partition in partitions {
+-            let offset = partition
+-                .offset
+-                .map(|value| format!("0x{value:08x}"))
+-                .unwrap_or_else(|| "—".to_string());
+-            html.push_str(&format!(
+-                "<tr><td>mtd{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td><a data-t=\"download\" href=\"/backup/{}\">Download</a></td></tr>",
+-                partition.index,
+-                html_escape(&partition.name),
+-                display::format_size(partition.size),
+-                display::format_size(partition.erase_size),
+-                offset,
+-                partition.index,
+-            ));
+-        }
+-        html.push_str("</tbody></table>");
+-        html
+-    }
+-
+     fn no_store(response: &mut Response) {
+         response
+             .headers_mut()
+@@ -96,10 +66,10 @@ mod linux_app {
+     }
+ 
+     async fn index() -> Response {
+-        let partitions = mtd::discover_partitions().unwrap_or_default();
+         let page = INDEX_HTML
+             .replace("{{VERSION}}", env!("CARGO_PKG_VERSION"))
+-            .replace("{{PARTITIONS}}", &partition_table(&partitions));
++            .replace("{{WIZARD_SHARED}}", wizard::WIZARD_JS)
++            .replace("{{WIZARD_STOCK}}", wizard::WIZARD_STOCK_JS);
+         let mut response = Html(page).into_response();
+         no_store(&mut response);
+         response
+@@ -165,6 +135,184 @@ mod linux_app {
+         response
+     }
+ 
++    fn tar_octal(header: &mut [u8], value: u64) -> io::Result<()> {
++        let digits = format!("{value:o}");
++        if digits.len() >= header.len() {
++            return Err(io::Error::new(
++                io::ErrorKind::InvalidData,
++                "MTD size exceeds tar format",
++            ));
++        }
++        header.fill(b'0');
++        let start = header.len() - 1 - digits.len();
++        header[start..start + digits.len()].copy_from_slice(digits.as_bytes());
++        header[header.len() - 1] = 0;
++        Ok(())
++    }
++
++    fn tar_header(name: &str, size: u64) -> io::Result<[u8; 512]> {
++        if name.len() > 100 || !name.is_ascii() {
++            return Err(io::Error::new(
++                io::ErrorKind::InvalidData,
++                "Invalid tar filename",
++            ));
++        }
++        let mut header = [0u8; 512];
++        header[..name.len()].copy_from_slice(name.as_bytes());
++        tar_octal(&mut header[100..108], 0o644)?;
++        tar_octal(&mut header[108..116], 0)?;
++        tar_octal(&mut header[116..124], 0)?;
++        tar_octal(&mut header[124..136], size)?;
++        tar_octal(&mut header[136..148], 0)?;
++        header[148..156].fill(b' ');
++        header[156] = b'0';
++        header[257..263].copy_from_slice(b"ustar\0");
++        header[263..265].copy_from_slice(b"00");
++        let checksum: u64 = header.iter().map(|byte| u64::from(*byte)).sum();
++        let text = format!("{checksum:06o}\0 ");
++        header[148..156].copy_from_slice(text.as_bytes());
++        Ok(header)
++    }
++
++    fn tar_entry_size(size: u64) -> Option<u64> {
++        size.checked_add(511)?
++            .checked_div(512)?
++            .checked_mul(512)?
++            .checked_add(512)
++    }
++
++    async fn tar_file<W: AsyncWriteExt + Unpin>(
++        output: &mut W,
++        name: &str,
++        size: u64,
++        input: &mut tokio::fs::File,
++    ) -> io::Result<()> {
++        output.write_all(&tar_header(name, size)?).await?;
++        let copied = tokio::io::copy(&mut input.take(size), output).await?;
++        if copied != size {
++            return Err(io::Error::new(
++                io::ErrorKind::UnexpectedEof,
++                "MTD backup ended early",
++            ));
++        }
++        let padding = (512 - size % 512) % 512;
++        output.write_all(&[0u8; 512][..padding as usize]).await?;
++        Ok(())
++    }
++
++    async fn download_all_partitions() -> Response {
++        let partitions = match mtd::discover_partitions() {
++            Ok(partitions) if !partitions.is_empty() => partitions,
++            Ok(_) => return text_response(StatusCode::NOT_FOUND, "No MTD partitions found"),
++            Err(error) => {
++                return text_response(
++                    StatusCode::INTERNAL_SERVER_ERROR,
++                    format!("Reading the MTD partition table failed: {error}"),
++                );
++            }
++        };
++        // Open every source before sending an archive header, so a missing
++        // device cannot produce an apparently successful partial download.
++        let mut sources = Vec::with_capacity(partitions.len());
++        for partition in &partitions {
++            let file = match tokio::fs::File::open(&partition.path).await {
++                Ok(file) => file,
++                Err(error) => {
++                    return text_response(
++                        StatusCode::INTERNAL_SERVER_ERROR,
++                        format!("Opening {} failed: {error}", partition.path.display()),
++                    );
++                }
++            };
++            sources.push(file);
++        }
++        let metadata = serde_json::to_vec_pretty(
++            &partitions
++                .iter()
++                .map(|partition| {
++                    serde_json::json!({
++                        "index": partition.index,
++                        "name": partition.name,
++                        "size": partition.size,
++                        "erase_size": partition.erase_size,
++                        "offset": partition.offset,
++                    })
++                })
++                .collect::<Vec<_>>(),
++        )
++        .unwrap();
++        let mut archive_size = match tar_entry_size(metadata.len() as u64) {
++            Some(size) => size + 1024,
++            None => {
++                return text_response(StatusCode::INTERNAL_SERVER_ERROR, "Archive is too large");
++            }
++        };
++        for partition in &partitions {
++            if tar_header(&format!("mtd{}.bin", partition.index), partition.size).is_err() {
++                return text_response(
++                    StatusCode::INTERNAL_SERVER_ERROR,
++                    "MTD size exceeds tar format",
++                );
++            }
++            archive_size = match tar_entry_size(partition.size)
++                .and_then(|size| archive_size.checked_add(size))
++            {
++                Some(size) => size,
++                None => {
++                    return text_response(
++                        StatusCode::INTERNAL_SERVER_ERROR,
++                        "Archive is too large",
++                    );
++                }
++            };
++        }
++        let (reader, mut writer) = tokio::io::duplex(64 * 1024);
++        tokio::spawn(async move {
++            let result: io::Result<()> = async {
++                writer
++                    .write_all(&tar_header("partitions.json", metadata.len() as u64)?)
++                    .await?;
++                writer.write_all(&metadata).await?;
++                writer
++                    .write_all(&[0u8; 512][..(512 - metadata.len() % 512) % 512])
++                    .await?;
++                for (partition, mut file) in partitions.into_iter().zip(sources) {
++                    tar_file(
++                        &mut writer,
++                        &format!("mtd{}.bin", partition.index),
++                        partition.size,
++                        &mut file,
++                    )
++                    .await?;
++                }
++                writer.write_all(&[0u8; 1024]).await?;
++                writer.shutdown().await
++            }
++            .await;
++            if let Err(error) = result {
++                eprintln!("MTD archive backup failed: {error}");
++            }
++        });
++        let mut response = Response::new(Body::from_stream(ReaderStream::with_capacity(
++            reader,
++            64 * 1024,
++        )));
++        response.headers_mut().insert(
++            header::CONTENT_TYPE,
++            HeaderValue::from_static("application/x-tar"),
++        );
++        response.headers_mut().insert(
++            header::CONTENT_LENGTH,
++            HeaderValue::from_str(&archive_size.to_string()).unwrap(),
++        );
++        response.headers_mut().insert(
++            header::CONTENT_DISPOSITION,
++            HeaderValue::from_static("attachment; filename=an758x-visible-mtd.tar"),
++        );
++        no_store(&mut response);
++        response
++    }
++
+     fn schedule_reboot() {
+         tokio::spawn(async {
+             // Allow the success response to reach the browser before reboot.
+@@ -179,6 +327,248 @@ mod linux_app {
+         });
+     }
+ 
++    // --- wizard endpoints -------------------------------------------------
++
++    const META_JSON: &str = include_str!(concat!(env!("OUT_DIR"), "/wizard_meta.json"));
++
++    fn wizard_meta() -> serde_json::Value {
++        serde_json::from_str(META_JSON).unwrap_or_else(|_| serde_json::json!({"embedded": false}))
++    }
++
++    async fn api_wizard() -> Response {
++        let meta = wizard_meta();
++        if !meta
++            .get("embedded")
++            .and_then(|value| value.as_bool())
++            .unwrap_or(false)
++        {
++            return json_response(
++                StatusCode::NOT_FOUND,
++                "This binary was built without embedded wizard images; use the manual page",
++            );
++        }
++        let probe = probe::run();
++        let partitions: Vec<serde_json::Value> = probe
++            .mtd
++            .iter()
++            .map(|partition| {
++                serde_json::json!({
++                    "index": partition.index,
++                    "name": partition.name,
++                    "size": partition.size,
++                    "erase_size": partition.erase_size,
++                    "offset": partition.offset,
++                })
++            })
++            .collect();
++        let found: Vec<serde_json::Value> = probe
++            .found
++            .iter()
++            .map(|found| {
++                serde_json::json!({
++                    "target_volume": found.target_volume,
++                    "source_names": found.source_names,
++                    "mtd_index": found.mtd_index,
++                    "mtd_name": found.mtd_name,
++                    "read_length": found.read_length,
++                    "size_ok": found.size_ok,
++                    "bad_blocks": found.bad_blocks,
++                })
++            })
++            .collect();
++        let mut body = meta;
++        body["match"] = serde_json::json!(probe.kind.as_str());
++        body["auto_ok"] = serde_json::json!(probe.auto_ok);
++        body["model_unconfirmed"] = serde_json::json!(probe.dtb_model.is_none());
++        body["evidence"] = serde_json::json!({
++            "kernel_release": probe.kernel_release,
++            "dtb_model": probe.dtb_model,
++            "mtd": partitions,
++        });
++        body["found"] = serde_json::json!(found);
++        body["reasons"] = serde_json::json!(probe.reasons);
++        let mut response = Json(body).into_response();
++        no_store(&mut response);
++        response
++    }
++
++    async fn download_image(Path(name): Path<String>) -> Response {
++        let (data, filename, sha) = match name.as_str() {
++            "bl2" => (wizard::BL2, "bl2.bin", wizard::BL2_SHA256),
++            "fip" => (wizard::FIP, "fip.bin", wizard::FIP_SHA256),
++            _ => return text_response(StatusCode::NOT_FOUND, "Unknown image"),
++        };
++        if !wizard::EMBEDDED {
++            return text_response(
++                StatusCode::NOT_FOUND,
++                "This binary was built without embedded wizard images",
++            );
++        }
++        let mut response = Response::new(Body::from(data));
++        response.headers_mut().insert(
++            header::CONTENT_TYPE,
++            HeaderValue::from_static("application/octet-stream"),
++        );
++        response.headers_mut().insert(
++            header::CONTENT_LENGTH,
++            HeaderValue::from_str(&data.len().to_string()).unwrap(),
++        );
++        let disposition = format!("attachment; filename=\"{filename}\"");
++        response.headers_mut().insert(
++            header::CONTENT_DISPOSITION,
++            HeaderValue::from_str(&disposition).unwrap(),
++        );
++        response.headers_mut().insert(
++            header::ETAG,
++            HeaderValue::from_str(&format!("\"{sha}\"")).unwrap(),
++        );
++        no_store(&mut response);
++        response
++    }
++
++    async fn download_wizard_js() -> Response {
++        if !wizard::EMBEDDED {
++            return text_response(StatusCode::NOT_FOUND, "No wizard JavaScript embedded");
++        }
++        let mut response = Response::new(Body::from(wizard::WIZARD_JS));
++        response.headers_mut().insert(
++            header::CONTENT_TYPE,
++            HeaderValue::from_static("text/javascript; charset=utf-8"),
++        );
++        response.headers_mut().insert(
++            header::CONTENT_LENGTH,
++            HeaderValue::from_str(&wizard::WIZARD_JS.len().to_string()).unwrap(),
++        );
++        no_store(&mut response);
++        response
++    }
++
++    async fn download_backup_range(
++        Path((index, offset, length)): Path<(u32, u64, u64)>,
++    ) -> Response {
++        let partitions = match mtd::discover_partitions() {
++            Ok(partitions) => partitions,
++            Err(error) => {
++                return text_response(
++                    StatusCode::INTERNAL_SERVER_ERROR,
++                    format!("Reading the MTD partition table failed: {error}"),
++                );
++            }
++        };
++        let Some(partition) = partitions
++            .iter()
++            .find(|partition| partition.index == index)
++            .cloned()
++        else {
++            return text_response(StatusCode::NOT_FOUND, "MTD partition not found");
++        };
++        // The first-block range only makes sense when the selected partition
++        // is the one covering physical offset 0.
++        if partition.offset != Some(0) {
++            return text_response(
++                StatusCode::BAD_REQUEST,
++                "The selected MTD partition does not cover physical offset 0",
++            );
++        }
++        if length == 0 || offset.saturating_add(length) > partition.size {
++            return text_response(StatusCode::BAD_REQUEST, "Range exceeds the MTD partition");
++        }
++
++        let file = match tokio::fs::File::open(&partition.path).await {
++            Ok(file) => file,
++            Err(error) => {
++                return text_response(
++                    StatusCode::INTERNAL_SERVER_ERROR,
++                    format!("Opening {} failed: {error}", partition.path.display()),
++                );
++            }
++        };
++
++        // The response length follows /proc/mtd; Tokio streams the raw device.
++        let stream = ReaderStream::with_capacity(file.take(length), 64 * 1024);
++        let disposition = format!(
++            "attachment; filename=\"mtd{}-firstblock-{}.bin\"",
++            partition.index, partition.name
++        );
++        let mut response = Response::new(Body::from_stream(stream));
++        response.headers_mut().insert(
++            header::CONTENT_TYPE,
++            HeaderValue::from_static("application/octet-stream"),
++        );
++        response.headers_mut().insert(
++            header::CONTENT_LENGTH,
++            HeaderValue::from_str(&length.to_string()).unwrap(),
++        );
++        response.headers_mut().insert(
++            header::CONTENT_DISPOSITION,
++            HeaderValue::from_str(&disposition).unwrap(),
++        );
++        no_store(&mut response);
++        response
++    }
++
++    async fn flash_embedded() -> Response {
++        if !wizard::EMBEDDED {
++            return json_response(
++                StatusCode::NOT_FOUND,
++                "This binary was built without embedded wizard images",
++            );
++        }
++        if wizard::FIP.len() > MAX_EMBEDDED_FIP {
++            return json_response(
++                StatusCode::INTERNAL_SERVER_ERROR,
++                "Embedded FIP exceeds the supported size",
++            );
++        }
++        // The wizard refuses one-click flashing unless the device probe
++        // fully resolved every source partition. `auto_ok` is the same gate
++        // the page uses to show the one-click entry at all; without it only
++        // the manual upload page can flash, exactly like upstream.
++        let probe = probe::run();
++        if probe.kind == probe::MatchKind::Conflict {
++            return json_response(
++                StatusCode::CONFLICT,
++                format!(
++                    "Device probe conflicts with this build target: {}",
++                    probe.reasons.join("; ")
++                ),
++            );
++        }
++        if !probe.auto_ok {
++            return json_response(
++                StatusCode::CONFLICT,
++                format!(
++                    "Device not fully confirmed for one-click flashing: {}",
++                    probe.reasons.join("; ")
++                ),
++            );
++        }
++        if FLASH_IN_PROGRESS
++            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
++            .is_err()
++        {
++            return json_response(StatusCode::CONFLICT, "A flash operation is already running");
++        }
++        let result = tokio::task::spawn_blocking(|| install::flash(wizard::BL2, wizard::FIP)).await;
++        match result {
++            Ok(Ok(message)) => {
++                schedule_reboot();
++                json_response(StatusCode::OK, message)
++            }
++            Ok(Err(error)) => {
++                FLASH_IN_PROGRESS.store(false, Ordering::Release);
++                json_response(StatusCode::BAD_REQUEST, error)
++            }
++            Err(error) => {
++                FLASH_IN_PROGRESS.store(false, Ordering::Release);
++                json_response(
++                    StatusCode::INTERNAL_SERVER_ERROR,
++                    format!("Flash task exited unexpectedly: {error}"),
++                )
++            }
++        }
++    }
++
+     async fn flash(mut multipart: Multipart) -> Response {
+         let mut bl2 = None;
+         let mut fip_image = None;
+@@ -263,9 +653,12 @@ mod linux_app {
+                 }
+                 "--ignore-kernel-version" => ignore_kernel_version = true,
+                 "--help" | "-h" => {
+-                    println!(
+-                        "usage: an758x-stock2ubi [--listen 0.0.0.0:3333] [--ignore-kernel-version]"
+-                    );
++                    let name = if wizard::TARGET.is_empty() {
++                        "airoha-installer".to_string()
++                    } else {
++                        format!("{}-installer", wizard::TARGET)
++                    };
++                    println!("usage: {name} [--listen 0.0.0.0:3333] [--ignore-kernel-version]");
+                     std::process::exit(0);
+                 }
+                 _ => return Err(format!("Unknown argument: {argument}")),
+@@ -303,13 +696,57 @@ mod linux_app {
+         let app = Router::new()
+             .route("/", get(index))
+             .route("/backup/{index}", get(download_backup))
++            .route("/backup-all.tar", get(download_all_partitions))
+             .route("/api/flash", post(flash))
++            .route("/api/wizard", get(api_wizard))
++            .route("/api/image/{name}", get(download_image))
++            .route("/api/wizard.js", get(download_wizard_js))
++            .route(
++                "/api/backup-range/{index}/{offset}/{length}",
++                get(download_backup_range),
++            )
++            .route("/api/flash-embedded", post(flash_embedded))
+             .layer(DefaultBodyLimit::max(MAX_UPLOAD_SIZE));
+         let listener = tokio::net::TcpListener::bind(&listen).await?;
+-        println!("AN758x Stock2UBI listening on http://{listen}");
++        println!("AN758x Recovery Installer listening on http://{listen}");
+         axum::serve(listener, app).await?;
+         Ok(())
+     }
++
++    #[cfg(test)]
++    #[tokio::test]
++    async fn streamed_tar_entry_is_readable_by_tar() {
++        let prefix = std::env::temp_dir().join(format!("an758x-tar-test-{}", std::process::id()));
++        let source = prefix.with_extension("bin");
++        let archive = prefix.with_extension("tar");
++        tokio::fs::write(&source, b"test-mtd-data").await.unwrap();
++        let mut file = tokio::fs::File::open(&source).await.unwrap();
++        let (mut reader, mut writer) = tokio::io::duplex(4096);
++        let writing = tokio::spawn(async move {
++            tar_file(&mut writer, "mtd0.bin", 13, &mut file)
++                .await
++                .unwrap();
++            writer.write_all(&[0u8; 1024]).await.unwrap();
++        });
++        let mut data = Vec::new();
++        reader.read_to_end(&mut data).await.unwrap();
++        writing.await.unwrap();
++        tokio::fs::write(&archive, data).await.unwrap();
++        let output = std::process::Command::new("tar")
++            .arg("-xOf")
++            .arg(&archive)
++            .arg("mtd0.bin")
++            .output()
++            .unwrap();
++        assert!(
++            output.status.success(),
++            "{}",
++            String::from_utf8_lossy(&output.stderr)
++        );
++        assert_eq!(output.stdout, b"test-mtd-data");
++        let _ = tokio::fs::remove_file(source).await;
++        let _ = tokio::fs::remove_file(archive).await;
++    }
+ }
+ 
+ #[cfg(target_os = "linux")]
+@@ -320,5 +757,5 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+ 
+ #[cfg(not(target_os = "linux"))]
+ fn main() {
+-    eprintln!("an758x-stock2ubi requires Linux MTD character devices");
++    eprintln!("AN758x Recovery Installer requires Linux MTD character devices");
+ }

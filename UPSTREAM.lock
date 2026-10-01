@@ -1,0 +1,5 @@
+# Pinned upstream commits for paired builds. Update these together with the
+# submodule gitlinks after reviewing upstream changes. The build refuses to run when the
+# checked-out submodule HEAD differs from the pinned SHA.
+uboot-an758x      8075dc2264caa63e64e4934e7ac27c7c7a5efcca
+an758x-stock2ubi  4fd1244f3b3f45c707e0517e278c3c1aa7c101ca
