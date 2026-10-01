@@ -19,6 +19,8 @@
 - 上述交叉工具链与 Mbed TLS
 - Rust stable（`rustup target add aarch64-unknown-linux-musl`）
 
+本次交叉构建与 CI 测试使用 Rust 1.97.1；CI 固定这个版本，避免 GitHub runner 的 Rust/Clippy 升级改变检查结果。
+
 ## 构建
 
 ```sh

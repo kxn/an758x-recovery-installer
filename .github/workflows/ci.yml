@@ -5,6 +5,8 @@ on:
 jobs:
   host-tests:
     runs-on: ubuntu-latest
+    env:
+      RUSTUP_TOOLCHAIN: 1.97.1
     steps:
       - uses: actions/checkout@v4
         with:
@@ -15,6 +17,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install tested Rust toolchain
+        run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --component clippy --component rustfmt
       - name: Shared library and flow tests
         run: node --test tests/*.test.js tests/flow/*.test.js
       - name: Recovery client tests
