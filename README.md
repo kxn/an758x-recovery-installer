@@ -72,7 +72,9 @@ python3 -m unittest discover -s tests -p 'test_*.py'
 python3 tools/check-upstream.py --fail
 ```
 
-`build/`、`output/` 和本地工具链依赖不提交到 Git；请自行构建并核对 `checksums.txt`。
+预编译包见 [GitHub Releases](https://github.com/kxn/an758x-recovery-installer/releases)。MD、MF 下载 `*-installer-*.zip` 向导包，也可直接下载对应的安装程序；其他机型下载 `*-manual-*.zip` 手动包，原厂端仅提供备份功能。每个包都有构建记录与校验文件，所有产物均未实机验证。
+
+`build/`、`output/` 和本地工具链依赖不提交到 Git。自动构建与发版操作见 [发布文档](docs/release.md)。
 
 ## 许可证
 

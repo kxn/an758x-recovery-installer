@@ -1,0 +1,187 @@
+name: Build model packages and release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'SemVer version (e.g. 0.1.0-rc.1)'
+        required: true
+        default: '0.1.0-rc.1'
+        type: string
+      publish:
+        description: 'Publish a GitHub Release after all builds pass'
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: model-release-${{ github.ref }}-${{ inputs.version || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    uses: ./.github/workflows/ci.yml
+
+  plan:
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      version: ${{ steps.plan.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - id: plan
+        name: Discover upstream models and validate version
+        env:
+          REQUESTED_VERSION: ${{ github.event_name == 'push' && github.ref_name || inputs.version }}
+        run: |
+          version=$(python3 tools/release.py version "$REQUESTED_VERSION")
+          matrix=$(python3 tools/release.py matrix)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          python3 -c 'import json,sys; print(json.dumps(json.loads(sys.argv[1]), indent=2))' "$matrix"
+
+  build:
+    needs: [checks, plan]
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    env:
+      RUSTUP_TOOLCHAIN: '1.97.1'
+      CROSS_COMPILE: aarch64-linux-gnu-
+      ARM32_CROSS_COMPILE: arm-none-eabi-
+      BUILD_JOBS: '4'
+      WIZARD_VERSION: ${{ needs.plan.outputs.version }}
+      MODEL: ${{ matrix.target }}
+      BUILD_MODE: ${{ matrix.mode }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential bc bison flex device-tree-compiler \
+            gcc-aarch64-linux-gnu gcc-arm-none-eabi libnewlib-arm-none-eabi \
+            libssl-dev openssl python3-dev python3-setuptools swig
+          rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --target aarch64-unknown-linux-musl
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: cargo-${{ runner.os }}-1.97.1-${{ hashFiles('upstream/an758x-stock2ubi/Cargo.lock') }}
+      - name: Build paired boot images and model binary
+        run: |
+          if [ "$BUILD_MODE" = paired ]; then
+            tools/build.sh "$MODEL"
+          else
+            tools/build.sh "$MODEL" --manual
+          fi
+      - name: Verify and package model
+        run: python3 tools/release.py pack "$MODEL" --mode "$BUILD_MODE" --version "$WIZARD_VERSION"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-${{ matrix.target }}
+          path: output/assets/*.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+      - name: Save build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log-${{ matrix.target }}
+          path: build/${{ matrix.target }}/uboot-build.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+  publish:
+    needs: [plan, build]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_VERSION: ${{ needs.plan.outputs.version }}
+      MATRIX_JSON: ${{ needs.plan.outputs.matrix }}
+      SHOULD_PUBLISH: ${{ github.event_name == 'push' || inputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: package-*
+          merge-multiple: true
+          path: output/release-assets
+      - name: Verify all packages and generate checksums
+        run: |
+          python3 - <<'PY'
+          import os, pathlib
+          pathlib.Path('output/release-matrix.json').write_text(os.environ['MATRIX_JSON'])
+          PY
+          python3 tools/release.py assemble --version "$RELEASE_VERSION" \
+            --matrix output/release-matrix.json --assets output/release-assets
+          python3 - <<'PY'
+          import json, os
+          release = json.load(open('output/release-assets/release-manifest.json'))
+          assert all(p['source_commit'] == os.environ['GITHUB_SHA'] for p in release['packages'])
+          PY
+          cd output/release-assets
+          sha256sum -c SHA256SUMS
+      - name: Generate release notes
+        run: |
+          gh api "repos/$GH_REPO/releases?per_page=100" > output/previous-releases.json
+          previous=$(python3 - <<'PY'
+          import json
+          releases = json.load(open('output/previous-releases.json'))
+          print(next((r['tag_name'] for r in releases if not r['draft'] and not r['prerelease']), ''))
+          PY
+          )
+          args=(notes --assets output/release-assets --output output/release-notes.md)
+          if [ -n "$previous" ]; then args+=(--previous "$previous"); fi
+          python3 tools/release.py "${args[@]}"
+          cat output/release-notes.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Save complete release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-assets-v${{ needs.plan.outputs.version }}
+          path: |
+            output/release-assets/*
+            output/release-notes.md
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+      - name: Publish complete GitHub Release
+        if: env.SHOULD_PUBLISH == 'true'
+        run: |
+          tag="v$RELEASE_VERSION"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists; refusing to replace published assets" >&2
+            exit 1
+          fi
+          options=()
+          if [[ "$RELEASE_VERSION" == *-* ]]; then options+=(--prerelease); fi
+          assets=(output/release-assets/*)
+          gh release create "$tag" "${assets[@]}" --draft --target "$GITHUB_SHA" \
+            --title "AN758x Recovery Installer $tag" --notes-file output/release-notes.md "${options[@]}"
+          gh release view "$tag" --json assets > output/uploaded-assets.json
+          python3 - <<'PY'
+          import json, pathlib
+          expected = {p.name: p.stat().st_size for p in pathlib.Path('output/release-assets').iterdir() if p.is_file()}
+          actual = {p['name']: p['size'] for p in json.load(open('output/uploaded-assets.json'))['assets']}
+          assert actual == expected, (actual, expected)
+          PY
+          gh release edit "$tag" --draft=false
+          echo "Release: https://github.com/$GH_REPO/releases/tag/$tag" >> "$GITHUB_STEP_SUMMARY"

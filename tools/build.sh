@@ -56,12 +56,15 @@ jobs="${BUILD_JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)}"
 # Prefer rustup's cargo over a possibly-too-old distro cargo. Keep it as a
 # shell function so it works when quoted and unquoted. We run it inside
 # subshells, so capture the absolute path here.
-if command -v rustup >/dev/null 2>&1 && rustup toolchain list 2>/dev/null | grep -q stable; then
+if command -v rustup >/dev/null 2>&1; then
 	RUSTUP_BIN="$(command -v rustup)"
-	cargo() { "$RUSTUP_BIN" run stable cargo "$@"; }
+	RUST_TOOLCHAIN="${RUSTUP_TOOLCHAIN:-stable}"
+	cargo() { "$RUSTUP_BIN" run "$RUST_TOOLCHAIN" cargo "$@"; }
+	rust_version="$("$RUSTUP_BIN" run "$RUST_TOOLCHAIN" rustc --version)"
 else
 	CARGO_BIN="$(command -v "${CARGO:-cargo}")"
 	cargo() { "$CARGO_BIN" "$@"; }
+	rust_version="$(rustc --version)"
 fi
 
 # --- 0. toolchain checks ---------------------------------------------------
@@ -226,6 +229,7 @@ esac
 [ -n "$bl2_bin" ] || { echo "$boot_image image missing in $artifact_dir" >&2; exit 1; }
 [ -n "$fip_bin" ] || { echo "FIP image missing in $artifact_dir" >&2; exit 1; }
 dtb_bin="$artifact_dir/u-boot.dtb"
+firstblock_bin="$(ls "$artifact_dir"/*-firstblock.bin 2>/dev/null | head -1)"
 [ -f "$dtb_bin" ] || { echo "u-boot.dtb missing; layout checks skipped" >&2; dtb_bin=""; }
 
 model=""
@@ -244,10 +248,15 @@ fi
 
 # Structural FIP checks so a broken pair cannot ship (magic, entries,
 # terminator boundary); signing state is reported, not enforced.
-python3 - "$bl2_bin" "$fip_bin" <<'PYEOF' || exit 1
+python3 - "$bl2_bin" "$fip_bin" "$firstblock_bin" <<'PYEOF' || exit 1
 import struct, sys
 for path in sys.argv[1:]:
+    if not path:
+        continue
     data = open(path, 'rb').read()
+    if path.endswith('-firstblock.bin'):
+        assert len(data) == 0x20000, f"{path}: unexpected first eraseblock size"
+        data = data[0x800:]
     assert len(data) >= 56, f"{path}: too small"
     assert struct.unpack_from('<I', data, 0)[0] == 0xaa640001, f"{path}: bad FIP ToC magic"
     entries = 0
@@ -320,6 +329,9 @@ release="$output_root/$target-installer-$version"
 rm -rf "$release"
 mkdir -p "$release"
 cp "$bl2_bin" "$release/$target-$boot_image.bin"
+if [ -n "$firstblock_bin" ] && [ "$boot_image" != "firstblock" ]; then
+	cp "$firstblock_bin" "$release/$target-firstblock.bin"
+fi
 cp "$fip_bin" "$release/$target-u-boot.fip"
 cp "$stock_out/$installer_bin" "$release/$installer_bin"
 [ -n "$dtb_bin" ] && cp "$dtb_bin" "$release/$target-u-boot.dtb"
@@ -334,6 +346,9 @@ an758x-stock2ubi: $stock_pinned
 mode: $mode
 uboot_model: ${model:-<unknown>}
 signed: $signed
+source_commit: $(git -C "$root_dir" rev-parse HEAD)
+mbedtls_commit: $(git -C "$MBEDTLS_DIR" rev-parse HEAD 2>/dev/null || echo external-source)
+rust: $rust_version
 EOF
 [ -f "$profile" ] &&
 	echo "profile: $target.json ($(python3 -c "import json;print(json.load(open('$profile'))['status'])"))" \
